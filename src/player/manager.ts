@@ -11,6 +11,7 @@ import {
   VoiceConnectionStatus,
 } from "@discordjs/voice";
 import { createRequire } from "node:module";
+import { Readable } from "node:stream";
 import type { VoiceBasedChannel } from "discord.js";
 import type { DroppedNeedleClient } from "../droppedneedle/client.js";
 import type { PlayableTrack } from "../droppedneedle/types.js";
@@ -134,11 +135,18 @@ export class GuildPlayer {
       adapterCreator: channel.guild.voiceAdapterCreator,
       selfDeaf: true,
     });
-    this.connection.subscribe(this.player);
     this.connection.on("error", (error) => {
       console.error(`[rou] voice connection error in guild ${this.guildId}:`, error);
     });
+    this.connection.on("stateChange", (oldState, newState) => {
+      if (oldState.status !== newState.status) {
+        console.log(`[rou] voice ${oldState.status} -> ${newState.status}`);
+      }
+    });
+    console.log(`[rou] joining voice channel ${channel.id}`);
     await entersState(this.connection, VoiceConnectionStatus.Ready, 20_000);
+    this.connection.subscribe(this.player);
+    console.log("[rou] voice ready");
   }
 
   private async advance(): Promise<boolean> {
@@ -157,36 +165,21 @@ export class GuildPlayer {
   }
 
   private async playTrack(track: QueueItem): Promise<void> {
-    const { url, ffmpegHeaders } = await this.needle.streamInput(track);
-    console.log(`[rou] streaming ${track.title} from ${url}`);
+    const url = track.streamUrl ?? this.needle.streamUrl(track.fileId);
+    console.log(`[rou] fetching stream for ${track.title} (${url})`);
+    const webStream = await this.needle.openStream(track);
+    const input = Readable.fromWeb(webStream);
     const ffmpeg = new FFmpeg({
-      args: [
-        "-reconnect",
-        "1",
-        "-reconnect_streamed",
-        "1",
-        "-reconnect_delay_max",
-        "5",
-        "-headers",
-        ffmpegHeaders,
-        "-i",
-        url,
-        "-analyzeduration",
-        "0",
-        "-loglevel",
-        "warning",
-        "-f",
-        "s16le",
-        "-ar",
-        "48000",
-        "-ac",
-        "2",
-      ],
+      args: ["-loglevel", "warning", "-f", "s16le", "-ar", "48000", "-ac", "2"],
     });
     ffmpeg.process.stderr?.on("data", (chunk: Buffer) => {
       const text = chunk.toString().trim();
       if (text) console.error(`[rou] ffmpeg: ${text}`);
     });
+    input.on("error", (error) => {
+      console.error(`[rou] stream input error for ${track.title}:`, error);
+    });
+    input.pipe(ffmpeg);
     const resource = createAudioResource(ffmpeg, {
       inputType: StreamType.Raw,
       inlineVolume: true,
@@ -198,6 +191,7 @@ export class GuildPlayer {
     try {
       this.player.play(resource);
       await entersState(this.player, AudioPlayerStatus.Playing, 20_000);
+      console.log(`[rou] playing ${track.title}`);
     } finally {
       this.starting = false;
     }

@@ -220,8 +220,9 @@ async function playQuery(
   }
 
   const queued = tracks.map((track) => toQueueItem(track, interaction.user.displayName));
-  const position = await player.enqueue(channel, queued);
   const first = queued[0]!;
+  await interaction.editReply(`Found **${first.title}** — ${first.artist}. Joining voice…`);
+  const position = await player.enqueue(channel, queued);
   const extra =
     queued.length > 1
       ? `${queued.length} tracks from *${first.album}*`

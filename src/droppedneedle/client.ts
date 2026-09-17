@@ -277,7 +277,14 @@ export class DroppedNeedleClient {
       if (!isStream && !headers.has("Accept")) {
         headers.set("Accept", "application/json");
       }
-      return fetch(url, { ...init, headers });
+      if (isStream) {
+        headers.set("Accept", "*/*");
+      }
+      return fetch(url, {
+        ...init,
+        headers,
+        signal: init?.signal ?? AbortSignal.timeout(isStream ? 30_000 : 15_000),
+      });
     };
 
     let response = await send();
