@@ -144,7 +144,16 @@ export class GuildPlayer {
       }
     });
     console.log(`[rou] joining voice channel ${channel.id}`);
-    await entersState(this.connection, VoiceConnectionStatus.Ready, 20_000);
+    try {
+      await entersState(this.connection, VoiceConnectionStatus.Ready, 20_000);
+    } catch (error) {
+      this.connection.destroy();
+      this.connection = undefined;
+      throw new Error(
+        "Discord voice never became ready (UDP handshake failed). Set network_mode: host on the Dockge stack and recreate it.",
+        { cause: error },
+      );
+    }
     this.connection.subscribe(this.player);
     console.log("[rou] voice ready");
   }

@@ -3,9 +3,11 @@ services:
     image: ghcr.io/cptsamfalcon/rou-bot:latest
     container_name: rou-bot
     restart: unless-stopped
+    network_mode: host
     env_file: .env
     environment:
       TZ: UTC
+      NODE_OPTIONS: --dns-result-order=ipv4first
     logging:
       driver: json-file
       options:

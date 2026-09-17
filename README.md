@@ -16,10 +16,14 @@ services:
     image: ghcr.io/cptsamfalcon/rou-bot:latest
     container_name: rou-bot
     restart: unless-stopped
+    network_mode: host
     env_file: .env
     environment:
       TZ: UTC
+      NODE_OPTIONS: --dns-result-order=ipv4first
 ```
+
+`network_mode: host` is required so Discord voice UDP can leave the machine. A Docker bridge network will join the channel, then stall (`signalling` ↔ `connecting`) with no audio.
 
 2. In the env editor:
 
