@@ -6,15 +6,15 @@ Slash commands: `/play`, `/album`, `/search`, `/skip`, `/pause`, `/resume`, `/st
 
 ## Dockge
 
-The image is `ghcr.io/cptsamfalcon/rou:latest`. Dockge only needs this compose file plus a host `.env` — not the git checkout.
+The image is `ghcr.io/cptsamfalcon/rou-bot:latest`. Dockge only needs this compose file plus a host `.env` — not the git checkout.
 
-1. In Dockge, **+ Compose**, name the stack `rou`, paste:
+1. In Dockge, **+ Compose**, name the stack `rou-bot`, paste:
 
 ```yaml
 services:
   rou:
-    image: ghcr.io/cptsamfalcon/rou:latest
-    container_name: rou
+    image: ghcr.io/cptsamfalcon/rou-bot:latest
+    container_name: rou-bot
     restart: unless-stopped
     env_file: .env
     environment:

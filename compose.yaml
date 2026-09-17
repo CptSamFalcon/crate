@@ -1,11 +1,11 @@
 services:
   rou:
-    image: ghcr.io/cptsamfalcon/rou:latest
-    container_name: rou
+    image: ghcr.io/cptsamfalcon/rou-bot:latest
+    container_name: rou-bot
     restart: unless-stopped
     env_file: .env
     environment:
-      TZ: America/Los_Angeles
+      TZ: UTC
     logging:
       driver: json-file
       options:
