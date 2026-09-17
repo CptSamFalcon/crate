@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
 import { generateDependencyReport } from "@discordjs/voice";
 import { loadConfig } from "./config.js";
@@ -12,7 +13,14 @@ try {
   throw error;
 }
 
-const ffmpegPath = createRequire(import.meta.url)("ffmpeg-static") as string | null;
+try {
+  await import("@discordjs/opus");
+} catch (error) {
+  console.warn("[rou] native opus failed to load, audio may hitch:", error);
+}
+
+const ffmpegStatic = createRequire(import.meta.url)("ffmpeg-static") as string | null;
+const ffmpegPath = existsSync("/usr/bin/ffmpeg") ? "/usr/bin/ffmpeg" : ffmpegStatic;
 if (ffmpegPath) {
   process.env.FFMPEG_PATH = ffmpegPath;
   process.env.FFMPEG_BIN = ffmpegPath;

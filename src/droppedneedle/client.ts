@@ -280,11 +280,32 @@ export class DroppedNeedleClient {
       if (isStream) {
         headers.set("Accept", "*/*");
       }
-      return fetch(url, {
-        ...init,
-        headers,
-        signal: init?.signal ?? AbortSignal.timeout(isStream ? 30_000 : 15_000),
-      });
+      const controller = new AbortController();
+      const onAbort = () => controller.abort();
+      if (init?.signal) {
+        if (init.signal.aborted) controller.abort();
+        else init.signal.addEventListener("abort", onAbort, { once: true });
+      }
+      const timeoutMs = isStream ? 30_000 : 15_000;
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const response = await fetch(url, {
+          ...init,
+          headers,
+          signal: controller.signal,
+        });
+        // Headers arrived. Keep the audio body open for the whole track.
+        if (isStream) clearTimeout(timer);
+        return response;
+      } catch (error) {
+        clearTimeout(timer);
+        throw error;
+      } finally {
+        if (!isStream) {
+          clearTimeout(timer);
+          init?.signal?.removeEventListener("abort", onAbort);
+        }
+      }
     };
 
     let response = await send();

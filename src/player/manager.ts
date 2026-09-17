@@ -10,13 +10,11 @@ import {
   type VoiceConnection,
   VoiceConnectionStatus,
 } from "@discordjs/voice";
-import { createRequire } from "node:module";
 import { Readable } from "node:stream";
 import type { VoiceBasedChannel } from "discord.js";
 import type { DroppedNeedleClient } from "../droppedneedle/client.js";
 import type { PlayableTrack } from "../droppedneedle/types.js";
-
-const { FFmpeg } = createRequire(import.meta.url)("prism-media") as typeof import("prism-media");
+import { transcodeToPcm, type TranscodeSession } from "./ffmpeg.js";
 
 export type QueueItem = PlayableTrack & {
   requestedBy: string;
@@ -37,6 +35,7 @@ export class GuildPlayer {
   private stopped = false;
   private starting = false;
   private volume = 0.8;
+  private transcode: TranscodeSession | undefined;
 
   constructor(
     readonly guildId: string,
@@ -117,6 +116,8 @@ export class GuildPlayer {
     this.queue.length = 0;
     this.current = undefined;
     this.player.stop(true);
+    this.transcode?.stop();
+    this.transcode = undefined;
     this.connection?.destroy();
     this.connection = undefined;
     this.stopped = false;
@@ -135,13 +136,9 @@ export class GuildPlayer {
       adapterCreator: channel.guild.voiceAdapterCreator,
       selfDeaf: true,
       daveEncryption: true,
-      debug: true,
     });
     this.connection.on("error", (error) => {
       console.error(`[rou] voice connection error in guild ${this.guildId}:`, error);
-    });
-    this.connection.on("debug", (message) => {
-      console.log(`[rou] voice debug: ${message}`);
     });
     this.connection.on("stateChange", (oldState, newState) => {
       if (oldState.status !== newState.status) {
@@ -181,20 +178,13 @@ export class GuildPlayer {
   private async playTrack(track: QueueItem): Promise<void> {
     const url = track.streamUrl ?? this.needle.streamUrl(track.fileId);
     console.log(`[rou] fetching stream for ${track.title} (${url})`);
+    this.transcode?.stop();
+    this.transcode = undefined;
     const webStream = await this.needle.openStream(track);
-    const input = Readable.fromWeb(webStream);
-    const ffmpeg = new FFmpeg({
-      args: ["-loglevel", "warning", "-f", "s16le", "-ar", "48000", "-ac", "2"],
-    });
-    ffmpeg.process.stderr?.on("data", (chunk: Buffer) => {
-      const text = chunk.toString().trim();
-      if (text) console.error(`[rou] ffmpeg: ${text}`);
-    });
-    input.on("error", (error) => {
-      console.error(`[rou] stream input error for ${track.title}:`, error);
-    });
-    input.pipe(ffmpeg);
-    const resource = createAudioResource(ffmpeg, {
+    const input = Readable.fromWeb(webStream, { highWaterMark: 1_048_576 });
+    const transcode = await transcodeToPcm(input);
+    this.transcode = transcode;
+    const resource = createAudioResource(transcode.stream, {
       inputType: StreamType.Raw,
       inlineVolume: true,
       metadata: track,
@@ -206,6 +196,10 @@ export class GuildPlayer {
       this.player.play(resource);
       await entersState(this.player, AudioPlayerStatus.Playing, 20_000);
       console.log(`[rou] playing ${track.title}`);
+    } catch (error) {
+      transcode.stop();
+      if (this.transcode === transcode) this.transcode = undefined;
+      throw error;
     } finally {
       this.starting = false;
     }
