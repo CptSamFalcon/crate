@@ -146,6 +146,19 @@ export class DroppedNeedleClient {
     }
   }
 
+  async streamInput(track: PlayableTrack): Promise<{ url: string; ffmpegHeaders: string }> {
+    if (!this.token && this.auth.kind === "password") {
+      await this.login(this.auth.username, this.auth.password);
+    }
+    if (!this.token) {
+      throw new DroppedNeedleError("DroppedNeedle client has no bearer token");
+    }
+    return {
+      url: track.streamUrl ?? this.streamUrl(track.fileId),
+      ffmpegHeaders: `Authorization: Bearer ${this.token}\r\nUser-Agent: RouDiscordBot/0.1\r\n`,
+    };
+  }
+
   async openStream(track: PlayableTrack): Promise<ReadableStream<Uint8Array>> {
     const url = track.streamUrl ?? this.streamUrl(track.fileId);
     const response = await this.request(url, { method: "GET" }, true);

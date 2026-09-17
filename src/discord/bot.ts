@@ -209,6 +209,10 @@ async function playQuery(
   const query = interaction.options.getString("query", true);
   await interaction.deferReply();
   const tracks = mode === "album" ? await findAlbum(needle, query) : await findTracks(needle, query, true);
+  console.log(
+    `[rou] /${mode} "${query}" -> ${tracks.length} track(s)`,
+    tracks.slice(0, 3).map((track) => `${track.title} — ${track.artist}`),
+  );
 
   if (tracks.length === 0) {
     await interaction.editReply(await missingLibraryMessage(needle, query));

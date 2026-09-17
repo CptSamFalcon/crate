@@ -10,7 +10,7 @@ import {
   type VoiceConnection,
   VoiceConnectionStatus,
 } from "@discordjs/voice";
-import { Readable } from "node:stream";
+import { FFmpeg } from "prism-media";
 import type { VoiceBasedChannel } from "discord.js";
 import type { DroppedNeedleClient } from "../droppedneedle/client.js";
 import type { PlayableTrack } from "../droppedneedle/types.js";
@@ -32,6 +32,7 @@ export class GuildPlayer {
   private readonly queue: QueueItem[] = [];
   private current: NowPlaying | undefined;
   private stopped = false;
+  private starting = false;
   private volume = 0.8;
 
   constructor(
@@ -39,14 +40,14 @@ export class GuildPlayer {
     private readonly needle: DroppedNeedleClient,
   ) {
     this.player = createAudioPlayer({
-      behaviors: { noSubscriber: NoSubscriberBehavior.Pause },
+      behaviors: { noSubscriber: NoSubscriberBehavior.Play },
     });
     this.player.on("error", (error) => {
       console.error(`[rou] audio error in guild ${guildId}:`, error);
-      void this.advance();
+      if (!this.starting) void this.advance();
     });
     this.player.on(AudioPlayerStatus.Idle, () => {
-      if (this.stopped) return;
+      if (this.stopped || this.starting) return;
       void this.advance();
     });
   }
@@ -75,7 +76,10 @@ export class GuildPlayer {
     const startNow = this.isIdle();
     this.queue.push(...tracks);
     if (startNow) {
-      await this.advance();
+      const started = await this.advance();
+      if (!started) {
+        throw new Error(`Found ${tracks[0]?.title ?? "a track"} but could not start the audio stream`);
+      }
     }
     return startNow ? 0 : this.queue.length - tracks.length + 1;
   }
@@ -135,25 +139,65 @@ export class GuildPlayer {
     await entersState(this.connection, VoiceConnectionStatus.Ready, 20_000);
   }
 
-  private async advance(): Promise<void> {
+  private async advance(): Promise<boolean> {
     const next = this.queue.shift();
     if (!next) {
       this.current = undefined;
-      return;
+      return false;
     }
     try {
-      const stream = await this.needle.openStream(next);
-      const resource = createAudioResource(Readable.fromWeb(stream), {
-        inputType: StreamType.Arbitrary,
-        inlineVolume: true,
-        metadata: next,
-      });
-      resource.volume?.setVolume(this.volume);
-      this.current = { track: next, startedAt: Date.now() };
-      this.player.play(resource);
+      await this.playTrack(next);
+      return true;
     } catch (error) {
       console.error(`[rou] failed to start ${next.title}:`, error);
-      await this.advance();
+      return this.advance();
+    }
+  }
+
+  private async playTrack(track: QueueItem): Promise<void> {
+    const { url, ffmpegHeaders } = await this.needle.streamInput(track);
+    console.log(`[rou] streaming ${track.title} from ${url}`);
+    const ffmpeg = new FFmpeg({
+      args: [
+        "-reconnect",
+        "1",
+        "-reconnect_streamed",
+        "1",
+        "-reconnect_delay_max",
+        "5",
+        "-headers",
+        ffmpegHeaders,
+        "-i",
+        url,
+        "-analyzeduration",
+        "0",
+        "-loglevel",
+        "warning",
+        "-f",
+        "s16le",
+        "-ar",
+        "48000",
+        "-ac",
+        "2",
+      ],
+    });
+    ffmpeg.process.stderr?.on("data", (chunk: Buffer) => {
+      const text = chunk.toString().trim();
+      if (text) console.error(`[rou] ffmpeg: ${text}`);
+    });
+    const resource = createAudioResource(ffmpeg, {
+      inputType: StreamType.Raw,
+      inlineVolume: true,
+      metadata: track,
+    });
+    resource.volume?.setVolume(this.volume);
+    this.starting = true;
+    this.current = { track, startedAt: Date.now() };
+    try {
+      this.player.play(resource);
+      await entersState(this.player, AudioPlayerStatus.Playing, 20_000);
+    } finally {
+      this.starting = false;
     }
   }
 }
