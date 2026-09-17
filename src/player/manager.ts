@@ -10,10 +10,12 @@ import {
   type VoiceConnection,
   VoiceConnectionStatus,
 } from "@discordjs/voice";
-import { FFmpeg } from "prism-media";
+import { createRequire } from "node:module";
 import type { VoiceBasedChannel } from "discord.js";
 import type { DroppedNeedleClient } from "../droppedneedle/client.js";
 import type { PlayableTrack } from "../droppedneedle/types.js";
+
+const { FFmpeg } = createRequire(import.meta.url)("prism-media") as typeof import("prism-media");
 
 export type QueueItem = PlayableTrack & {
   requestedBy: string;
