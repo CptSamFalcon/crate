@@ -5,6 +5,13 @@ import { loadConfig } from "./config.js";
 import { DroppedNeedleClient } from "./droppedneedle/client.js";
 import { createBot } from "./discord/bot.js";
 
+try {
+  await import("@snazzah/davey");
+} catch (error) {
+  console.error("[rou] DAVE native module failed to load:", error);
+  throw error;
+}
+
 const ffmpegPath = createRequire(import.meta.url)("ffmpeg-static") as string | null;
 if (ffmpegPath) {
   process.env.FFMPEG_PATH = ffmpegPath;

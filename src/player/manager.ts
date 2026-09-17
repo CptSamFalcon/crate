@@ -134,9 +134,14 @@ export class GuildPlayer {
       guildId: channel.guild.id,
       adapterCreator: channel.guild.voiceAdapterCreator,
       selfDeaf: true,
+      daveEncryption: true,
+      debug: true,
     });
     this.connection.on("error", (error) => {
       console.error(`[rou] voice connection error in guild ${this.guildId}:`, error);
+    });
+    this.connection.on("debug", (message) => {
+      console.log(`[rou] voice debug: ${message}`);
     });
     this.connection.on("stateChange", (oldState, newState) => {
       if (oldState.status !== newState.status) {
@@ -150,7 +155,7 @@ export class GuildPlayer {
       this.connection.destroy();
       this.connection = undefined;
       throw new Error(
-        "Discord voice never became ready (UDP handshake failed). Set network_mode: host on the Dockge stack and recreate it.",
+        "Discord voice never became ready. Need DAVE encryption (@discordjs/voice 0.19) and outbound UDP (network_mode: host).",
         { cause: error },
       );
     }
