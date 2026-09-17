@@ -18,7 +18,7 @@ services:
     restart: unless-stopped
     env_file: .env
     environment:
-      TZ: America/Los_Angeles
+      TZ: UTC
 ```
 
 2. In the env editor:
@@ -26,12 +26,12 @@ services:
 ```env
 TOKEN=
 GUILD_ID=
-DROPPEDNEEDLE_URL=https://music.samflixplusprime.org
+DROPPEDNEEDLE_URL=https://your-droppedneedle.example
 DROPPEDNEEDLE_USERNAME=
 DROPPEDNEEDLE_PASSWORD=
 ```
 
-`TOKEN` is your Discord bot token. Client id is read after login. Use a dedicated DroppedNeedle **Trusted** user for Rou.
+`TOKEN` is your Discord bot token. Client id is read after login. Use a dedicated DroppedNeedle **Trusted** user for Rou. `DROPPEDNEEDLE_URL` is your DroppedNeedle base URL (no trailing slash).
 
 3. Deploy. Later updates: Dockge **Update** (pulls a new `:latest`) then start.
 
@@ -41,9 +41,8 @@ If another bot is still using the same Discord token, stop it first.
 
 ## Local run
 
-```powershell
-cd $env:USERPROFILE\rou
-copy .env.example .env
+```bash
+cp .env.example .env
 npm install
 npm start
 ```
