@@ -35,7 +35,7 @@ services:
     command: tunnel --no-autoupdate run
 ```
 
-`network_mode: host` is required so Discord voice UDP can leave the machine. A Docker bridge network will join the channel, then stall (`signalling` ↔ `connecting`) with no audio. Host networking also exposes the dashboard on `WEB_PORT` (default `8787`).
+`network_mode: host` is required so Discord voice UDP can leave the machine. A Docker bridge network will join the channel, then stall (`signalling` ↔ `connecting`) with no audio. The dashboard listens on `127.0.0.1:WEB_PORT` (default `8787`) so only the tunnel can reach it. Set `WEB_BIND=0.0.0.0` only if you need the LAN to hit it directly.
 
 2. In the env editor:
 
@@ -65,6 +65,7 @@ WEB_PORT=8787
 CLIENT_SECRET=
 GUILD_ID=
 CLOUDFLARE_TUNNEL_TOKEN=
+SESSION_SECRET=
 ```
 
 Discord OAuth only allows HTTP on localhost, so the public URL must be HTTPS. The `tunnel` service in the compose file is [cloudflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/). Do not put Cloudflare Access in front of this hostname; Discord OAuth is the lock, and Access would intercept `/auth/callback`.
@@ -79,9 +80,9 @@ If this machine already has a tunnel (for example DroppedNeedle), you can skip t
 
 `https://rou.yourdomain/auth/callback`
 
-Then **Deploy** (or **Update**) the Dockge stack. Rou logs `web UI on :8787` when the dashboard is enabled. The tunnel logs `Registered tunnel connection` when Cloudflare is up.
+Then **Deploy** (or **Update**) the Dockge stack. Rou logs `web UI on http://127.0.0.1:8787` when the dashboard is enabled. The tunnel logs `Registered tunnel connection` when Cloudflare is up.
 
-`CLIENT_SECRET` is the OAuth2 client secret for the same Discord application as the bot. Sign-in is limited to members of a server Rou is in. `GUILD_ID` is the default crate server; if Rou is in more than one, pick the server on the dashboard. Slash commands register in every server Rou joins. Playback stays in the voice channel you pick, or the one you're in.
+`CLIENT_SECRET` is the OAuth2 client secret for the same Discord application as the bot. Sign-in is limited to members of a server Rou is in, and playback controls only work for the server you're in. Set `SESSION_SECRET` to a long random string so dashboard sessions survive a token rotation. `GUILD_ID` is the default crate server; if Rou is in more than one, pick the server on the dashboard. Slash commands register in every server Rou joins. Playback stays in the voice channel you pick, or the one you're in.
 
 ## Local run
 

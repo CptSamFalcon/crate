@@ -13,6 +13,7 @@ const schema = z
     DROPPEDNEEDLE_PASSWORD: z.string().optional(),
     WEB_PUBLIC_URL: z.string().optional(),
     WEB_PORT: z.string().optional(),
+    WEB_BIND: z.string().optional(),
     SESSION_SECRET: z.string().optional(),
   })
   .superRefine((value, ctx) => {
@@ -27,6 +28,7 @@ const schema = z
 export type WebConfig = {
   publicUrl: string;
   port: number;
+  bind: string;
   clientSecret: string;
   sessionSecret: string;
   guildId: string;
@@ -49,6 +51,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     DROPPEDNEEDLE_PASSWORD: first(env.DROPPEDNEEDLE_PASSWORD),
     WEB_PUBLIC_URL: first(env.WEB_PUBLIC_URL),
     WEB_PORT: first(env.WEB_PORT),
+    WEB_BIND: first(env.WEB_BIND),
     SESSION_SECRET: first(env.SESSION_SECRET),
   });
 
@@ -58,8 +61,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   let web: WebConfig | undefined;
   if (publicUrl && clientSecret && guildId) {
     web = {
-      publicUrl,
+      publicUrl: assertPublicUrl(publicUrl),
       port: Number(parsed.WEB_PORT) || 8787,
+      bind: assertBind(parsed.WEB_BIND || "127.0.0.1"),
       clientSecret,
       sessionSecret:
         parsed.SESSION_SECRET ?? createHash("sha256").update(parsed.DISCORD_TOKEN).digest("hex"),
@@ -72,6 +76,27 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     droppedNeedleUrl: parsed.DROPPEDNEEDLE_URL.replace(/\/+$/, ""),
     web,
   };
+}
+
+export function assertPublicUrl(publicUrl: string): string {
+  let parsed: URL;
+  try {
+    parsed = new URL(publicUrl);
+  } catch {
+    throw new Error("WEB_PUBLIC_URL must be a valid URL");
+  }
+  const host = parsed.hostname.toLowerCase();
+  const local = host === "localhost" || host === "127.0.0.1" || host === "::1";
+  if (parsed.protocol === "https:") return publicUrl;
+  if (parsed.protocol === "http:" && local) return publicUrl;
+  throw new Error("WEB_PUBLIC_URL must be https (http is only allowed on localhost)");
+}
+
+export function assertBind(bind: string): string {
+  if (!/^[\w.:-]+$/.test(bind)) {
+    throw new Error("WEB_BIND must be a hostname or IP address");
+  }
+  return bind;
 }
 
 function first(...values: Array<string | undefined>): string | undefined {

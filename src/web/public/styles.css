@@ -134,8 +134,18 @@ a {
   color: var(--muted);
 }
 
-.user img {
-  border-radius: 50%;
+.user form {
+  margin: 0;
+}
+
+.user button {
+  background: none;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  padding: 0;
+  text-decoration: underline;
 }
 
 .now {

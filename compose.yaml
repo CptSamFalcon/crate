@@ -4,7 +4,7 @@ services:
     container_name: rou-bot
     restart: unless-stopped
     network_mode: host
-    # Host mode also publishes the optional dashboard on WEB_PORT (default 8787).
+    # Dashboard binds to 127.0.0.1:WEB_PORT (default 8787). The tunnel reaches it there.
     env_file: .env
     environment:
       TZ: UTC
