@@ -383,7 +383,7 @@ a {
 
 .artwork {
   position: relative;
-  width: min(100%, 42vh, 440px);
+  width: min(100%, 56vh, 520px);
   aspect-ratio: 1;
   border-radius: 8px;
   overflow: hidden;
@@ -600,7 +600,6 @@ body.is-party .control-party .party-collapse {
 }
 
 .control-party {
-  margin-left: auto;
   color: var(--ink-2);
 }
 
@@ -1011,13 +1010,53 @@ body:not(.has-library) .library {
 }
 
 body.has-library .stage {
+  position: sticky;
+  top: var(--header);
+  z-index: 15;
   min-height: 0;
-  padding-bottom: 20px;
-  align-items: start;
+  padding: 14px 36px 16px;
+  align-items: center;
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  backdrop-filter: blur(28px);
 }
 
 body.has-library .stage-grid {
-  align-items: start;
+  align-items: center;
+  gap: 24px 32px;
+}
+
+body.has-library .artwork {
+  width: min(100%, 220px);
+  box-shadow: 0 16px 40px rgb(0 0 0 / 0.4);
+}
+
+body.has-library .now-copy h1 {
+  font-size: clamp(22px, 2.8vw, 34px);
+}
+
+body.has-library .now-artist {
+  font-size: 15px;
+}
+
+body.has-library .progress-block,
+body.has-library .transport-row {
+  margin-top: 14px;
+}
+
+body.has-library .connection {
+  margin-top: 14px;
+  padding-top: 10px;
+}
+
+body.has-library .control-play {
+  width: 52px;
+  height: 52px;
+}
+
+body.has-library .rail {
+  max-height: 248px;
+  overflow: auto;
+  padding-top: 0;
 }
 
 body.has-library .library {
@@ -1399,7 +1438,7 @@ body.is-party .stage-grid {
 }
 
 body.is-party .artwork {
-  width: min(78vmin, 560px);
+  width: min(72vmin, 620px);
   border-radius: 10px;
 }
 
@@ -1478,36 +1517,38 @@ body.is-party .ambient {
     align-items: start;
   }
 
+  body.has-library .stage {
+    position: relative;
+    top: auto;
+    padding: 16px 18px 18px;
+    backdrop-filter: none;
+  }
+
+  body.has-library .artwork,
+  .artwork {
+    width: min(86vw, 380px);
+    margin: 0 auto;
+  }
+
   .stage-grid,
   .rail,
   .album-hero {
     grid-template-columns: 1fr;
   }
 
-  .artwork {
-    width: min(86vw, 360px);
-    margin: 0 auto;
+  .transport-row {
+    flex-wrap: nowrap;
+    justify-content: center;
+    gap: 10px;
+  }
+
+  .volume input[type="range"] {
+    width: 72px;
   }
 
   .now-copy {
     text-align: center;
     max-width: none;
-  }
-
-  .now-copy h1 {
-    font-size: clamp(28px, 9vw, 40px);
-  }
-
-  .progress-block {
-    max-width: none;
-  }
-
-  .transport-row {
-    justify-content: center;
-  }
-
-  .control-party {
-    margin-left: 0;
   }
 
   .connection {

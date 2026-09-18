@@ -463,7 +463,8 @@ function tickElapsed() {
   }
   const update = () => {
     const total = current.durationSeconds || 0;
-    const seconds = Math.max(0, Math.floor((Date.now() - current.startedAt) / 1000));
+    const raw = Math.max(0, Math.floor((Date.now() - current.startedAt) / 1000));
+    const seconds = total > 0 ? Math.min(raw, total) : raw;
     elapsed.textContent = formatClock(seconds);
     duration.textContent = total ? formatClock(total) : "?:??";
     progress.value = total > 0 ? Math.min(1000, Math.round((seconds / total) * 1000)) : 0;
