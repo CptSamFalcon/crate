@@ -307,12 +307,20 @@ a {
 .stage {
   position: relative;
   isolation: isolate;
-  overflow: hidden;
+  overflow: visible;
   margin: 0;
   padding: 28px 36px 32px;
   min-height: calc(100dvh - var(--header));
   display: flex;
   align-items: center;
+}
+
+.stage-backdrop {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
 }
 
 .ambient {
@@ -734,8 +742,9 @@ body.is-party .control-party .party-collapse {
   left: 0;
   right: auto;
   min-width: 240px;
-  max-height: 320px;
+  max-height: min(320px, calc(100dvh - var(--header) - 24px));
   overflow: auto;
+  z-index: 40;
 }
 
 .picker-menu li + li {
@@ -1017,10 +1026,11 @@ body:not(.has-library) .library {
 body.has-library .stage {
   position: sticky;
   top: var(--header);
-  z-index: 15;
+  z-index: 18;
   min-height: 0;
   padding: 14px 36px 16px;
   align-items: center;
+  overflow: visible;
   background: color-mix(in srgb, var(--bg) 82%, transparent);
   backdrop-filter: blur(28px);
 }
@@ -1072,6 +1082,8 @@ body.has-library .rail {
 }
 
 body.has-library .library {
+  position: relative;
+  z-index: 1;
   padding-top: 22px;
   padding-bottom: 72px;
   border-top: 1px solid var(--line);
