@@ -4,8 +4,8 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Crate</title>
-    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-    <link rel="apple-touch-icon" href="/brand/crate-app-icon.svg" />
+    <link rel="icon" href="/brand/crate-favicon.png" type="image/png" />
+    <link rel="apple-touch-icon" href="/brand/crate-icon.png" />
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
@@ -78,13 +78,18 @@
       <symbol id="i-arrow" viewBox="0 0 24 24">
         <path d="M15 18l-6-6 6-6" />
       </symbol>
+      <symbol id="i-hash" viewBox="0 0 24 24">
+        <path d="M5 9h14" />
+        <path d="M5 15h14" />
+        <path d="m9.5 4-2 16" />
+        <path d="m16.5 4-2 16" />
+      </symbol>
     </svg>
 
     <div id="login" class="screen hidden">
       <div class="login-card">
         <div class="login-mark" aria-hidden="true">
-          <span class="login-orbit"></span>
-          <img src="/brand/crate-app-icon.svg" alt="" />
+          <img src="/brand/crate-logo.png" alt="" />
         </div>
         <p class="eyebrow">Discord music, your way</p>
         <h1>Crate</h1>
@@ -97,7 +102,7 @@
     <div id="app" class="app hidden">
       <header class="topbar">
         <a class="wordmark" href="/" aria-label="Crate home">
-          <img src="/brand/crate-mark.svg" alt="" />
+          <img src="/brand/crate-icon.png" alt="" />
           <span>Crate</span>
         </a>
         <form id="search-form" class="search" role="search">
@@ -138,8 +143,7 @@
           <div class="artwork" id="cover-wrap">
             <img id="cover" alt="" />
             <div class="idle-mark" aria-hidden="true">
-              <span class="idle-orbit"></span>
-              <img src="/brand/crate-mark.svg" alt="" />
+              <img src="/brand/crate-logo.png" alt="" />
             </div>
           </div>
 
@@ -198,6 +202,7 @@
               <div class="picker" id="channel-picker">
                 <button type="button" class="picker-btn" id="channel-button" aria-haspopup="listbox" aria-expanded="false" aria-label="Voice channel">
                   <span class="live-dot" id="voice-dot" data-state="off"></span>
+                  <svg class="icon channel-hash" aria-hidden="true"><use href="#i-hash"></use></svg>
                   <span class="picker-copy">
                     <small id="voice-state">Disconnected</small>
                     <strong id="channel-label">Choose a voice channel</strong>
@@ -241,9 +246,9 @@
         </div>
         <div id="browse">
           <div id="library-empty" class="library-empty">
-            <img class="empty-mark" src="/brand/crate-mark.svg" alt="" />
-            <h2>Search the crate</h2>
-            <p>Search for an artist, album, or track.</p>
+            <img class="empty-mark" src="/brand/crate-logo.png" alt="" />
+            <h2>Find something to play</h2>
+            <p>Search artists, albums, or tracks.</p>
           </div>
           <div id="results"></div>
         </div>

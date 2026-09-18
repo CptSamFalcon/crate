@@ -174,7 +174,7 @@ function renderStatus(next) {
     ? next.paused
       ? "Paused"
       : "Now playing"
-    : "";
+    : "Ready";
   document.body.classList.toggle("is-idle", !current);
   document.body.classList.toggle("is-playing", Boolean(current) && !next.paused);
   document.body.classList.toggle("is-paused", Boolean(current) && next.paused);
@@ -271,7 +271,7 @@ function renderQueue(current, queue) {
   queueEl.innerHTML = "";
   document.querySelector("#queue-count").textContent = queue.length ? String(queue.length) : "";
   if (!current && queue.length === 0) {
-    queueEl.innerHTML = `<li class="empty-row">Queue is empty.</li>`;
+    queueEl.innerHTML = `<li class="empty-row">Nothing queued yet.</li>`;
     return;
   }
   if (current) queueEl.append(queueRow(current, { now: true }));
@@ -383,7 +383,7 @@ function renderRequests(items) {
   requestsEl.innerHTML = "";
   document.querySelector("#request-count").textContent = items?.length ? String(items.length) : "";
   if (!items?.length) {
-    requestsEl.innerHTML = `<li class="empty-row">Nothing requested.</li>`;
+    requestsEl.innerHTML = `<li class="empty-row">No requests right now.</li>`;
     return;
   }
   for (const item of items) {
@@ -559,8 +559,8 @@ function renderSearch(payload) {
     libraryEmpty.querySelector("p").textContent = payload.message || "Try another artist, album, or track.";
     return;
   }
-    libraryEmpty.querySelector("h2").textContent = "Search the crate";
-    libraryEmpty.querySelector("p").textContent = "Search for an artist, album, or track.";
+    libraryEmpty.querySelector("h2").textContent = "Find something to play";
+    libraryEmpty.querySelector("p").textContent = "Search artists, albums, or tracks.";
   const parts = [];
   if (artists.length) parts.push(`${artists.length} artist${artists.length === 1 ? "" : "s"}`);
   if (albums.length) {

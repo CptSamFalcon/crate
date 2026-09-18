@@ -173,12 +173,13 @@ export function startWeb(deps: WebDeps): void {
   app.get("/styles.css", () => publicFile("styles.css", "text/css; charset=utf-8"));
   app.get("/rou.png", () => publicFile("rou.png", "image/png"));
   const brandFiles: Record<string, string> = {
-    "crate-mark.svg": "image/svg+xml; charset=utf-8",
-    "crate-logo.svg": "image/svg+xml; charset=utf-8",
-    "crate-app-icon.svg": "image/svg+xml; charset=utf-8",
+    "crate-logo.png": "image/png",
+    "crate-icon.png": "image/png",
+    "crate-favicon.png": "image/png",
     "tokens.css": "text/css; charset=utf-8",
   };
-  app.get("/favicon.svg", () => publicFile("brand/crate-app-icon.svg", "image/svg+xml; charset=utf-8"));
+  app.get("/favicon.png", () => publicFile("brand/crate-favicon.png", "image/png"));
+  app.get("/favicon.ico", () => publicFile("brand/crate-favicon.png", "image/png"));
   app.get("/brand/:name", (c) => {
     const name = c.req.param("name");
     const type = brandFiles[name];

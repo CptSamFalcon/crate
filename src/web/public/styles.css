@@ -15,7 +15,7 @@ body {
 
 body {
   background:
-    radial-gradient(900px 520px at 8% -18%, rgb(88 101 242 / 0.16), transparent 52%),
+    radial-gradient(820px 460px at 10% -22%, rgb(88 101 242 / 0.08), transparent 54%),
     var(--bg);
 }
 
@@ -120,29 +120,15 @@ a {
 }
 
 .login-mark {
-  position: relative;
-  width: 112px;
-  height: 112px;
+  width: 176px;
   margin: 0 auto 28px;
-  display: grid;
-  place-items: center;
-}
-
-.login-orbit {
-  position: absolute;
-  inset: -18px;
-  border-radius: 50%;
-  border: 2px solid rgb(129 140 248 / 0.16);
-  border-top-color: rgb(88 101 242 / 0.9);
-  animation: spin 9s linear infinite;
 }
 
 .login-mark img {
-  position: relative;
-  width: 112px;
-  height: 112px;
-  border-radius: 26px;
-  box-shadow: 0 18px 50px rgb(88 101 242 / 0.28);
+  display: block;
+  width: 176px;
+  height: auto;
+  filter: drop-shadow(0 22px 40px rgb(88 101 242 / 0.28));
 }
 
 .login-card h1 {
@@ -193,8 +179,8 @@ a {
 }
 
 .wordmark img {
-  width: 42px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   object-fit: contain;
 }
 
@@ -232,9 +218,9 @@ a {
 
 .search input:focus {
   outline: none;
-  border-color: rgb(88 101 242 / 0.7);
+  border-color: rgb(88 101 242 / 0.5);
   background: #1f2430;
-  box-shadow: 0 0 0 4px rgb(88 101 242 / 0.16);
+  box-shadow: 0 0 0 3px rgb(88 101 242 / 0.12);
 }
 
 .search input::-webkit-search-decoration,
@@ -408,7 +394,7 @@ a {
   display: grid;
   place-items: center;
   background:
-    radial-gradient(circle at 50% 42%, rgb(88 101 242 / 0.18), transparent 58%),
+    radial-gradient(circle at 50% 42%, rgb(88 101 242 / 0.16), transparent 58%),
     var(--surface-2);
 }
 
@@ -416,20 +402,15 @@ a {
   display: none;
 }
 
-.idle-orbit {
-  position: absolute;
-  width: 64%;
-  aspect-ratio: 1;
-  border-radius: 50%;
-  border: 2px solid rgb(129 140 248 / 0.16);
-  border-top-color: rgb(88 101 242 / 0.8);
-  animation: spin 10s linear infinite;
+body:not(.is-idle) .idle-mark {
+  background:
+    radial-gradient(circle at 50% 42%, rgb(88 101 242 / 0.08), transparent 58%),
+    var(--surface-2);
 }
 
 .idle-mark img {
-  width: 46%;
+  width: 78%;
   height: auto;
-  position: relative;
   object-fit: contain;
 }
 
@@ -561,7 +542,18 @@ progress::-moz-progress-bar {
   height: 62px;
   background: var(--primary);
   color: var(--brand-ink);
-  box-shadow: 0 10px 28px var(--glow);
+  box-shadow: 0 8px 22px rgb(88 101 242 / 0.22);
+}
+
+.control-play .play-icon,
+.control-play .pause-icon {
+  fill: currentColor;
+  stroke: none;
+}
+
+.control-play .play-icon {
+  width: 22px;
+  height: 22px;
 }
 
 .control-play:hover:not(:disabled) {
@@ -733,6 +725,11 @@ body.is-party .control-party .party-collapse {
   color: var(--ink-3);
 }
 
+.picker-btn .channel-hash {
+  width: 13px;
+  height: 13px;
+}
+
 .picker-menu {
   left: 0;
   right: auto;
@@ -788,18 +785,25 @@ body.is-party .control-party .party-collapse {
 .rail {
   display: grid;
   align-content: start;
-  gap: 28px;
+  gap: 0;
   min-width: 0;
   align-self: stretch;
-  padding: 8px 0 8px 8px;
+  padding: 4px 0 4px 4px;
+  background: rgb(42 47 56 / 0.28);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
 }
 
 .rail-card {
   min-width: 0;
-  background: rgb(42 47 56 / 0.32);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 14px 14px 10px;
+  background: none;
+  border: 0;
+  border-radius: 0;
+  padding: 16px 16px 12px;
+}
+
+.rail-card + .rail-card {
+  border-top: 1px solid var(--line);
 }
 
 .rail-head {
@@ -839,8 +843,9 @@ body.is-party .control-party .party-collapse {
   grid-template-columns: 1.7em 36px minmax(0, 1fr) auto auto;
   gap: 10px;
   align-items: center;
-  padding: 7px 0;
-  border-radius: 0;
+  padding: 8px;
+  margin: 0 -8px;
+  border-radius: 10px;
   transition: background var(--ease);
 }
 
@@ -860,7 +865,7 @@ body.is-party .control-party .party-collapse {
 
 .queue-list li:hover,
 .request-list li:hover {
-  background: transparent;
+  background: rgb(255 255 255 / 0.04);
 }
 
 .queue-list li:hover .queue-copy b,
@@ -872,12 +877,21 @@ body.is-party .control-party .party-collapse {
 .result-thumb {
   width: 36px;
   height: 36px;
-  border-radius: 4px;
+  border-radius: 8px;
   object-fit: cover;
-  background: var(--surface-2);
+  background-color: var(--surface-2);
+  background-image: url("/brand/crate-icon.png");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 58%;
   display: block;
   overflow: hidden;
   flex: 0 0 36px;
+}
+
+.queue-thumb:has(img),
+.result-thumb:has(img) {
+  background-image: none;
 }
 
 .queue-thumb img,
@@ -896,7 +910,7 @@ body.is-party .control-party .party-collapse {
 }
 
 .queue-list li.is-now .queue-index {
-  color: var(--accent);
+  color: var(--ink-2);
   font-size: 9px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -1017,31 +1031,36 @@ body.has-library .stage-grid {
 }
 
 body.has-library .artwork {
-  width: min(100%, 220px);
-  box-shadow: 0 16px 40px rgb(0 0 0 / 0.4);
+  width: min(100%, 176px);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.35);
 }
 
 body.has-library .now-copy h1 {
-  font-size: clamp(22px, 2.8vw, 34px);
+  font-size: clamp(20px, 2.5vw, 30px);
 }
 
 body.has-library .now-artist {
   font-size: 15px;
 }
 
+body.has-library .now-added {
+  display: none;
+}
+
 body.has-library .progress-block,
 body.has-library .transport-row {
-  margin-top: 14px;
+  margin-top: 10px;
 }
 
 body.has-library .connection {
-  margin-top: 14px;
-  padding-top: 10px;
+  margin-top: 10px;
+  padding-top: 8px;
 }
 
 body.has-library .control-play {
-  width: 52px;
-  height: 52px;
+  width: 48px;
+  height: 48px;
+  box-shadow: none;
 }
 
 body.has-library .rail {
@@ -1053,7 +1072,7 @@ body.has-library .rail {
 }
 
 body.has-library .library {
-  padding-top: 8px;
+  padding-top: 22px;
   padding-bottom: 72px;
   border-top: 1px solid var(--line);
 }
@@ -1095,10 +1114,9 @@ body:not(.has-library) #search-skeleton {
 }
 
 .empty-mark {
-  width: 64px;
+  width: 88px;
   height: auto;
-  margin-bottom: 12px;
-  opacity: 0.92;
+  margin-bottom: 14px;
 }
 
 .search-section {
@@ -1144,7 +1162,16 @@ body:not(.has-library) #search-skeleton {
   aspect-ratio: 1;
   border-radius: 50%;
   overflow: hidden;
-  background: var(--surface-2);
+  background-color: var(--surface-2);
+  background-image: url("/brand/crate-icon.png");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 42%;
+}
+
+.artist-card .art-wrap:has(img),
+.album-card .art-wrap:has(img) {
+  background-image: none;
 }
 
 .artist-card b,
@@ -1187,7 +1214,11 @@ body:not(.has-library) #search-skeleton {
   aspect-ratio: 1;
   border-radius: 12px;
   overflow: hidden;
-  background: var(--surface-2);
+  background-color: var(--surface-2);
+  background-image: url("/brand/crate-icon.png");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 42%;
   transition: transform var(--ease);
 }
 
@@ -1218,8 +1249,9 @@ body:not(.has-library) #search-skeleton {
 }
 
 .album-card.requestable .badge {
-  background: var(--brand);
-  color: var(--brand-ink);
+  background: rgb(15 17 21 / 0.72);
+  color: var(--text);
+  box-shadow: inset 0 0 0 1px rgb(129 140 248 / 0.35);
 }
 
 .album-card > span {
@@ -1269,10 +1301,10 @@ body:not(.has-library) #search-skeleton {
   background: transparent;
   color: var(--ink-2);
   border-radius: 999px;
-  padding: 5px 10px;
-  font-size: 12px;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
   transition: background var(--ease), color var(--ease);
 }
 
@@ -1311,7 +1343,11 @@ body:not(.has-library) #search-skeleton {
   aspect-ratio: 1;
   object-fit: cover;
   border-radius: 12px;
-  background: var(--surface-2);
+  background-color: var(--surface-2);
+  background-image: url("/brand/crate-icon.png");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 40%;
   display: block;
   overflow: hidden;
   color: transparent;
@@ -1464,12 +1500,6 @@ body.is-party .ambient {
   filter: blur(96px) saturate(1.2);
 }
 
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
 @keyframes pulse {
   50% {
     opacity: 0.55;
@@ -1491,10 +1521,14 @@ body.is-party .ambient {
   .rail {
     grid-column: 1 / -1;
     grid-template-columns: 1fr 1fr;
-    display: grid;
-    gap: 24px 40px;
-    padding: 8px 0 0;
-    border-top: 1px solid var(--line);
+    gap: 0;
+    padding: 4px;
+    border-top: 0;
+  }
+
+  .rail-card + .rail-card {
+    border-top: 0;
+    border-left: 1px solid var(--line);
   }
 }
 
@@ -1560,6 +1594,11 @@ body.is-party .ambient {
 
   .connection {
     justify-content: center;
+  }
+
+  .rail-card + .rail-card {
+    border-left: 0;
+    border-top: 1px solid var(--line);
   }
 
   .library,
