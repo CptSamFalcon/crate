@@ -77,24 +77,24 @@ export async function transcodeToPcm(input: Readable): Promise<TranscodeSession>
 
   ff.stderr.on("data", (chunk: Buffer) => {
     const text = chunk.toString().trim();
-    if (text) console.error(`[rou] ffmpeg: ${text}`);
+    if (text) console.error(`[crate] ffmpeg: ${text}`);
   });
   ff.on("error", (error) => {
-    console.error("[rou] ffmpeg process error:", error);
+    console.error("[crate] ffmpeg process error:", error);
     output.destroy(error);
   });
   ff.stdin.on("error", (error: NodeJS.ErrnoException) => {
-    if (error.code !== "EPIPE") console.error("[rou] ffmpeg stdin error:", error);
+    if (error.code !== "EPIPE") console.error("[crate] ffmpeg stdin error:", error);
   });
   ff.stdout.on("error", (error) => {
-    console.error("[rou] ffmpeg stdout error:", error);
+    console.error("[crate] ffmpeg stdout error:", error);
   });
   output.on("close", () => {
     if (!ff.killed) ff.kill("SIGKILL");
   });
 
   input.on("error", (error) => {
-    console.error("[rou] stream input error:", error);
+    console.error("[crate] stream input error:", error);
     stop();
   });
   const buffered = waitForBytes(output, PREBUFFER_BYTES, PREBUFFER_TIMEOUT_MS);

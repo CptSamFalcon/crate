@@ -3,8 +3,8 @@ import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import type { Context, MiddlewareHandler } from "hono";
 import type { WebConfig } from "../config.js";
 
-const SESSION_COOKIE = "rou_session";
-const STATE_COOKIE = "rou_oauth_state";
+const SESSION_COOKIE = "crate_session";
+const STATE_COOKIE = "crate_oauth_state";
 export const SESSION_MAX_AGE = 60 * 60 * 24 * 7;
 const STATE_MAX_AGE = 600;
 

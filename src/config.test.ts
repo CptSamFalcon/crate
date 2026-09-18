@@ -10,9 +10,9 @@ const required = {
 
 describe("assertPublicUrl", () => {
   it("requires https except on localhost", () => {
-    assert.equal(assertPublicUrl("https://rou.example"), "https://rou.example");
+    assert.equal(assertPublicUrl("https://crate.example"), "https://crate.example");
     assert.equal(assertPublicUrl("http://localhost:8787"), "http://localhost:8787");
-    assert.throws(() => assertPublicUrl("http://rou.example"), /https/);
+    assert.throws(() => assertPublicUrl("http://crate.example"), /https/);
     assert.throws(() => assertPublicUrl("not-a-url"), /valid URL/);
   });
 });
@@ -29,12 +29,12 @@ describe("loadConfig", () => {
   it("binds the dashboard to loopback by default", () => {
     const config = loadConfig({
       ...required,
-      WEB_PUBLIC_URL: "https://rou.example",
+      WEB_PUBLIC_URL: "https://crate.example",
       CLIENT_SECRET: "oauth-secret",
       GUILD_ID: "123",
     });
     assert.equal(config.web?.bind, "127.0.0.1");
-    assert.equal(config.web?.publicUrl, "https://rou.example");
+    assert.equal(config.web?.publicUrl, "https://crate.example");
   });
 
   it("refuses a public http dashboard url", () => {
@@ -42,7 +42,7 @@ describe("loadConfig", () => {
       () =>
         loadConfig({
           ...required,
-          WEB_PUBLIC_URL: "http://rou.example",
+          WEB_PUBLIC_URL: "http://crate.example",
           CLIENT_SECRET: "oauth-secret",
           GUILD_ID: "123",
         }),

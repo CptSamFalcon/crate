@@ -25,7 +25,7 @@ jobs:
           context: .
           push: true
           tags: |
-            ghcr.io/cptsamfalcon/rou-bot:latest
-            ghcr.io/cptsamfalcon/rou-bot:${{ github.sha }}
+            ghcr.io/cptsamfalcon/crate:latest
+            ghcr.io/cptsamfalcon/crate:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

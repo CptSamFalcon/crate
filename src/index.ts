@@ -10,14 +10,14 @@ import { startWeb } from "./web/server.js";
 try {
   await import("@snazzah/davey");
 } catch (error) {
-  console.error("[rou] DAVE native module failed to load:", error);
+  console.error("[crate] DAVE native module failed to load:", error);
   throw error;
 }
 
 try {
   await import("@discordjs/opus");
 } catch (error) {
-  console.warn("[rou] native opus failed to load, audio may hitch:", error);
+  console.warn("[crate] native opus failed to load, audio may hitch:", error);
 }
 
 const ffmpegStatic = createRequire(import.meta.url)("ffmpeg-static") as string | null;
@@ -34,9 +34,9 @@ const needle = new DroppedNeedleClient(config.droppedNeedleUrl, {
   password: config.DROPPEDNEEDLE_PASSWORD,
 });
 
-console.log("[rou] checking DroppedNeedle…");
+console.log("[crate] checking DroppedNeedle…");
 const user = await needle.connect();
-console.log(`[rou] DroppedNeedle ok as ${user.display_name} (${user.role}) @ ${config.droppedNeedleUrl}`);
+console.log(`[crate] DroppedNeedle ok as ${user.display_name} (${user.role}) @ ${config.droppedNeedleUrl}`);
 console.log(generateDependencyReport());
 
 const { client, players } = createBot({
@@ -51,7 +51,7 @@ await client.login(config.DISCORD_TOKEN);
 if (config.web) {
   startWeb({ config, web: config.web, client, players, needle });
 } else {
-  console.warn("[rou] web UI disabled: set WEB_PUBLIC_URL, CLIENT_SECRET, and GUILD_ID");
+  console.warn("[crate] web UI disabled: set WEB_PUBLIC_URL, CLIENT_SECRET, and GUILD_ID");
 }
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {

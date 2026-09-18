@@ -1,8 +1,8 @@
 {
-  "name": "rou-bot",
+  "name": "crate",
   "version": "0.1.0",
   "private": true,
-  "description": "Self-hosted Discord music bot backed by DroppedNeedle",
+  "description": "Crate — self-hosted Discord listening room backed by DroppedNeedle",
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",

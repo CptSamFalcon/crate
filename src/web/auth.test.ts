@@ -11,7 +11,7 @@ import {
 } from "./auth.js";
 
 const secret = "test-session-secret";
-const publicUrl = "https://rou.example";
+const publicUrl = "https://crate.example";
 
 describe("originAllowed", () => {
   it("rejects a missing origin", () => {
@@ -19,22 +19,22 @@ describe("originAllowed", () => {
   });
 
   it("allows the dashboard origin only", () => {
-    assert.equal(originAllowed("https://rou.example", publicUrl), true);
+    assert.equal(originAllowed("https://crate.example", publicUrl), true);
     assert.equal(originAllowed("https://evil.example", publicUrl), false);
-    assert.equal(originAllowed("https://rou.example.evil.com", publicUrl), false);
+    assert.equal(originAllowed("https://crate.example.evil.com", publicUrl), false);
   });
 });
 
 describe("mutatingRequestAllowed", () => {
   it("rejects cross-site posts even when a referer is present", () => {
     assert.equal(
-      mutatingRequestAllowed("https://evil.example", "https://rou.example/crate", publicUrl),
+      mutatingRequestAllowed("https://evil.example", "https://crate.example/crate", publicUrl),
       false,
     );
   });
 
   it("allows a same-origin referer when origin is missing", () => {
-    assert.equal(mutatingRequestAllowed(undefined, "https://rou.example/crate", publicUrl), true);
+    assert.equal(mutatingRequestAllowed(undefined, "https://crate.example/crate", publicUrl), true);
     assert.equal(mutatingRequestAllowed(undefined, undefined, publicUrl), false);
   });
 });
@@ -43,32 +43,32 @@ describe("session cookies", () => {
   it("rejects tampered and expired sessions", () => {
     const token = encode(secret, {
       id: "123456789012345678",
-      username: "rou",
-      globalName: "Rou",
+      username: "crate",
+      globalName: "Crate",
       avatar: null,
       exp: Date.now() + SESSION_MAX_AGE * 1000,
     });
-    assert.equal(sessionUserFromToken(secret, token)?.username, "rou");
+    assert.equal(sessionUserFromToken(secret, token)?.username, "crate");
     assert.equal(sessionUserFromToken("other-secret", token), null);
     assert.equal(sessionUserFromToken(secret, `${token}x`), null);
 
     const expired = encode(secret, {
       id: "123456789012345678",
-      username: "rou",
+      username: "crate",
       globalName: null,
       avatar: null,
       exp: Date.now() - 1000,
     });
     assert.equal(sessionUserFromToken(secret, expired), null);
 
-    const legacy = encode(secret, { id: "123456789012345678", username: "rou" });
+    const legacy = encode(secret, { id: "123456789012345678", username: "crate" });
     assert.equal(sessionUserFromToken(secret, legacy), null);
   });
 
   it("does not treat a signed payload as a session without a discord id", () => {
     const token = encode(secret, {
       id: "not-a-snowflake",
-      username: "rou",
+      username: "crate",
       globalName: null,
       avatar: null,
       exp: Date.now() + 60_000,
@@ -86,7 +86,7 @@ describe("session cookies", () => {
 
 describe("cookieSecure", () => {
   it("is secure only for https public urls", () => {
-    assert.equal(cookieSecure("https://rou.example"), true);
+    assert.equal(cookieSecure("https://crate.example"), true);
     assert.equal(cookieSecure("http://localhost:8787"), false);
   });
 });

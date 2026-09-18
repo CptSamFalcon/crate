@@ -24,7 +24,7 @@ import { registerSlashCommands } from "./registerCommands.js";
 
 const searchCache = new Map<string, PlayableTrack[]>();
 
-export type RouBot = {
+export type CrateBot = {
   client: Client;
   players: PlayerManager;
 };
@@ -34,14 +34,14 @@ export function createBot(options: {
   clientId?: string;
   guildId?: string;
   needle: DroppedNeedleClient;
-}): RouBot {
+}): CrateBot {
   const players = new PlayerManager(options.needle);
   const client = new Client({
     intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates],
   });
 
   client.once(Events.ClientReady, async (ready) => {
-    console.log(`[rou] logged in as ${ready.user.tag}`);
+    console.log(`[crate] logged in as ${ready.user.tag}`);
     const clientId = options.clientId ?? ready.user.id;
     for (const guild of ready.guilds.cache.values()) {
       try {
@@ -52,7 +52,7 @@ export function createBot(options: {
           commands: slashCommands,
         });
       } catch (error) {
-        console.warn(`[rou] could not register commands in ${guild.name}:`, error);
+        console.warn(`[crate] could not register commands in ${guild.name}:`, error);
       }
     }
   });
@@ -68,7 +68,7 @@ export function createBot(options: {
         commands: slashCommands,
       });
     } catch (error) {
-      console.warn(`[rou] could not register commands in ${guild.name}:`, error);
+      console.warn(`[crate] could not register commands in ${guild.name}:`, error);
     }
   });
 
@@ -76,7 +76,7 @@ export function createBot(options: {
     try {
       await handleInteraction(interaction, options.needle, players);
     } catch (error) {
-      console.error("[rou] interaction failed:", error);
+      console.error("[crate] interaction failed:", error);
       const message = "Something went wrong.";
       if (interaction.isRepliable() && !interaction.replied && !interaction.deferred) {
         await interaction.reply({ content: message, flags: MessageFlags.Ephemeral }).catch(() => undefined);
@@ -101,26 +101,27 @@ async function handleInteraction(
   if (interaction.isButton()) {
     if (!interaction.inGuild()) return;
     const player = players.get(interaction.guildId);
-    if (interaction.customId === "rou:skip") {
+    const customId = interaction.customId.replace(/^rou:/, "crate:");
+    if (customId === "crate:skip") {
       const skipped = player.skip();
       await interaction.reply(skipped ? `Skipped **${skipped.title}**.` : "Nothing is playing.");
       return;
     }
-    if (interaction.customId === "rou:pause") {
+    if (customId === "crate:pause") {
       await interaction.reply(player.pause() ? "Paused." : "Nothing is playing.");
       return;
     }
-    if (interaction.customId === "rou:resume") {
+    if (customId === "crate:resume") {
       await interaction.reply(player.resume() ? "Resumed." : "Nothing is paused.");
       return;
     }
-    if (interaction.customId === "rou:stop") {
+    if (customId === "crate:stop") {
       player.stop();
       await interaction.reply("Stopped and left the voice channel.");
     }
     return;
   }
-  if (interaction.isStringSelectMenu() && interaction.customId === "rou:pick") {
+  if (interaction.isStringSelectMenu() && interaction.customId.replace(/^rou:/, "crate:") === "crate:pick") {
     if (!interaction.inGuild() || !interaction.guild) return;
     const member = interaction.member as GuildMember;
     const channel = member.voice.channel;
@@ -157,7 +158,7 @@ async function handleCommand(
   players: PlayerManager,
 ): Promise<void> {
   if (!interaction.inGuild() || !interaction.guildId) {
-    await interaction.reply({ content: "Rou only works in servers.", flags: MessageFlags.Ephemeral });
+    await interaction.reply({ content: "Crate only works in servers.", flags: MessageFlags.Ephemeral });
     return;
   }
 
@@ -240,7 +241,7 @@ async function playQuery(
   await interaction.deferReply();
   const tracks = mode === "album" ? await findAlbum(needle, query) : await findTracks(needle, query, true);
   console.log(
-    `[rou] /${mode} "${query}" -> ${tracks.length} track(s)`,
+    `[crate] /${mode} "${query}" -> ${tracks.length} track(s)`,
     tracks.slice(0, 3).map((track) => `${track.title} — ${track.artist}`),
   );
 
