@@ -91,6 +91,38 @@ export type TrackRequestResponse = {
   message?: string;
 };
 
+export type NeedleActiveRequest = {
+  musicbrainz_id: string;
+  artist_name: string;
+  album_title: string;
+  status: string;
+  year?: number | null;
+  cover_url?: string | null;
+  progress?: number | null;
+  download_status?: string | null;
+  download_state?: string | null;
+  error_message?: string | null;
+  request_kind?: string;
+  track_title?: string | null;
+  track_release_group_mbid?: string | null;
+  in_library?: boolean;
+};
+
+export type NeedleRequestHistoryItem = NeedleActiveRequest & {
+  completed_at?: string | null;
+  in_library?: boolean;
+};
+
+export type NeedleActiveRequestsResponse = {
+  items?: NeedleActiveRequest[];
+  count?: number;
+};
+
+export type NeedleRequestHistoryResponse = {
+  items?: NeedleRequestHistoryItem[];
+  total?: number;
+};
+
 export type CatalogSearchResponse = {
   artists?: CatalogSearchResult[];
   albums?: CatalogSearchResult[];

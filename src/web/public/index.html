@@ -56,7 +56,7 @@
             <button type="button" data-action="stop" class="btn danger">Stop</button>
           </div>
           <label class="volume">
-            Volume
+            <span>Volume</span>
             <input id="volume" type="range" min="0" max="150" value="80" />
             <span id="volume-label">80%</span>
           </label>
@@ -90,6 +90,8 @@
         <aside class="panel queue-panel">
           <h2>Queue</h2>
           <ol id="queue" class="tracklist compact"></ol>
+          <h2>Requests</h2>
+          <ol id="requests" class="tracklist compact request-list"></ol>
         </aside>
       </div>
     </div>

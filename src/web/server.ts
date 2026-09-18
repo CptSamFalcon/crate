@@ -15,6 +15,7 @@ import {
   findTracks,
   getAlbum,
   getAlbumTracksById,
+  listIncomingRequests,
   missingLibrary,
   playableFromId,
   requestFromNeedle,
@@ -230,6 +231,11 @@ export function startWeb(deps: WebDeps): void {
       durationSeconds: body.durationSeconds,
     });
     return c.json(result);
+  });
+
+  api.get("/requests", async (c) => {
+    const items = await listIncomingRequests(needle);
+    return c.json({ items });
   });
 
   api.post("/skip", (c) => {

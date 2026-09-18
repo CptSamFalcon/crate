@@ -13,6 +13,8 @@ import type {
   NativeLibraryAlbumsResponse,
   NativeLibraryTrack,
   NativeLibraryTracksResponse,
+  NeedleActiveRequestsResponse,
+  NeedleRequestHistoryResponse,
   PlayableTrack,
   ResolvedTrack,
   TrackRequestResponse,
@@ -177,6 +179,19 @@ export class DroppedNeedleClient {
         }),
       },
     );
+  }
+
+  async listActiveRequests(): Promise<NeedleActiveRequestsResponse> {
+    return this.requestJson<NeedleActiveRequestsResponse>("/api/v1/requests/active");
+  }
+
+  async listRequestHistory(page = 1, pageSize = 20): Promise<NeedleRequestHistoryResponse> {
+    const params = new URLSearchParams({
+      page: String(page),
+      page_size: String(pageSize),
+      sort: "newest",
+    });
+    return this.requestJson<NeedleRequestHistoryResponse>(`/api/v1/requests/history?${params}`);
   }
 
   async getAlbumTracks(mbid: string): Promise<LocalTrackInfo[]> {

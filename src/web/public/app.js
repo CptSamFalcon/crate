@@ -3,6 +3,7 @@ const appEl = document.querySelector("#app");
 const loginError = document.querySelector("#login-error");
 const resultsEl = document.querySelector("#results");
 const queueEl = document.querySelector("#queue");
+const requestsEl = document.querySelector("#requests");
 const searchStatus = document.querySelector("#search-status");
 const volumeInput = document.querySelector("#volume");
 const volumeLabel = document.querySelector("#volume-label");
@@ -34,6 +35,7 @@ const LOGIN_ERRORS = {
 let status = null;
 let elapsedTimer = null;
 let openAlbum = null;
+let requestPoll = 0;
 
 function formatDuration(seconds) {
   if (!seconds || seconds <= 0) return "?:??";
@@ -122,6 +124,39 @@ function renderStatus(next) {
   tickElapsed();
 }
 
+function requestStatusClass(item) {
+  if (item.ready) return "ready";
+  if (item.statusLabel === "Failed" || item.statusLabel === "Cancelled") return "error";
+  return "muted";
+}
+
+function renderRequests(items) {
+  requestsEl.innerHTML = "";
+  if (!items?.length) {
+    requestsEl.innerHTML = `<li class="muted">Nothing requested.</li>`;
+    return;
+  }
+  for (const item of items) {
+    const row = document.createElement("li");
+    row.className = item.ready ? "ready" : "";
+    if (item.albumId) row.dataset.albumId = item.albumId;
+    row.innerHTML = `<span>${escapeHtml(item.title)}<small class="muted"> ${escapeHtml(item.artist)}</small></span><span class="${requestStatusClass(item)}">${escapeHtml(item.statusLabel)}</span>`;
+    if (item.albumId) {
+      row.addEventListener("click", () => void openAlbumView(item.albumId));
+    }
+    requestsEl.append(row);
+  }
+}
+
+async function loadRequests() {
+  try {
+    const payload = await api("/api/requests");
+    renderRequests(payload.items ?? []);
+  } catch {
+    // Keep the last list if DroppedNeedle is briefly unreachable.
+  }
+}
+
 function tickElapsed() {
   clearInterval(elapsedTimer);
   const elapsed = document.querySelector("#elapsed");
@@ -165,10 +200,9 @@ function renderAlbums(payload) {
       const card = document.createElement("button");
       card.type = "button";
       card.className = album.inLibrary ? "album-card" : "album-card requestable";
+      if (album.matchedTrack) card.title = `Matched “${album.matchedTrack}”`;
       const art = album.coverUrl ? `<img src="${escapeHtml(album.coverUrl)}" alt="">` : "";
-      card.innerHTML = `<div class="art-wrap">${art}${albumBadge(album)}</div><b>${escapeHtml(album.title)}</b><span>${escapeHtml(album.artist)}${
-        album.matchedTrack ? ` · has ${escapeHtml(album.matchedTrack)}` : album.year ? ` · ${album.year}` : ""
-      }</span>`;
+      card.innerHTML = `<div class="art-wrap">${art}${albumBadge(album)}</div><b>${escapeHtml(album.title)}</b><span>${escapeHtml(album.artist)}</span>`;
       const artImg = card.querySelector("img");
       artImg?.addEventListener("error", () => {
         artImg.remove();
@@ -304,6 +338,7 @@ async function requestMedia(body, button) {
     if (button && body.recordingMbid) {
       button.textContent = result.status === "already_in_library" ? "On crate" : "Requested";
     }
+    await loadRequests();
   } catch (error) {
     if (button) button.disabled = false;
     searchStatus.textContent = error.message;
@@ -382,6 +417,9 @@ async function boot() {
     document.querySelector("#avatar").src = avatarUrl(me);
     showApp();
     renderStatus(await api("/api/status"));
+    renderRequests([]);
+    await loadRequests();
+    requestPoll = window.setInterval(() => void loadRequests(), 10_000);
     const events = new EventSource("/api/events");
     events.addEventListener("message", (event) => {
       if (!event.data) return;

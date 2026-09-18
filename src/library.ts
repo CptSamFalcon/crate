@@ -1,6 +1,6 @@
 import type { DroppedNeedleClient } from "./droppedneedle/client.js";
 import { droppedNeedleMessage, isPublicCoverUrl } from "./droppedneedle/client.js";
-import type { CatalogAlbumTrack, PlayableTrack } from "./droppedneedle/types.js";
+import type { CatalogAlbumTrack, NeedleActiveRequest, PlayableTrack } from "./droppedneedle/types.js";
 import type { QueueItem } from "./player/manager.js";
 
 const playableById = new Map<string, PlayableTrack>();
@@ -578,4 +578,94 @@ export async function requestFromNeedle(
   } catch (error) {
     throw new Error(droppedNeedleMessage(error));
   }
+}
+
+export type IncomingRequest = {
+  id: string;
+  albumId: string | null;
+  kind: "album" | "track";
+  title: string;
+  artist: string;
+  status: string;
+  statusLabel: string;
+  progress: number | null;
+  ready: boolean;
+  coverUrl: string | null;
+  error: string | null;
+};
+
+function requestKey(item: { request_kind?: string; musicbrainz_id: string }): string {
+  return `${item.request_kind === "track" ? "track" : "album"}:${item.musicbrainz_id}`;
+}
+
+function progressPercent(progress: number | null | undefined): number | null {
+  if (progress == null || !Number.isFinite(progress)) return null;
+  const value = progress <= 1 ? progress * 100 : progress;
+  return Math.min(100, Math.max(0, Math.round(value)));
+}
+
+function isRequestReady(item: NeedleActiveRequest): boolean {
+  if (item.in_library) return true;
+  const status = (item.status ?? "").toLowerCase();
+  return status === "completed" || status === "already_in_library" || status === "fulfilled";
+}
+
+function requestStatusLabel(item: NeedleActiveRequest): string {
+  if (isRequestReady(item)) return "Ready";
+  const status = (item.download_state || item.download_status || item.status || "").toLowerCase();
+  if (status === "awaiting_approval" || status === "pending_approval") return "Needs approval";
+  if (status === "searching" || status === "pending" || status === "queued") return "Searching";
+  if (status.includes("download")) {
+    const percent = progressPercent(item.progress);
+    return percent != null ? `Downloading ${percent}%` : "Downloading";
+  }
+  if (status === "processing" || status === "importing") return "Importing";
+  if (status === "failed" || status === "error") return "Failed";
+  if (status === "cancelled" || status === "rejected") return "Cancelled";
+  return item.status || "Requested";
+}
+
+function serializeIncoming(needle: DroppedNeedleClient, item: NeedleActiveRequest): IncomingRequest {
+  const kind = item.request_kind === "track" ? "track" : "album";
+  const albumId = kind === "track" ? (item.track_release_group_mbid ?? null) : item.musicbrainz_id;
+  const title = kind === "track" ? (item.track_title || item.album_title) : item.album_title;
+  const cover =
+    needle.resolveUrl(item.cover_url) ??
+    coverArtArchiveUrl(albumId ?? (kind === "album" ? item.musicbrainz_id : null));
+  return {
+    id: item.musicbrainz_id,
+    albumId,
+    kind,
+    title: title || "Untitled",
+    artist: item.artist_name || "Unknown artist",
+    status: item.status,
+    statusLabel: requestStatusLabel(item),
+    progress: progressPercent(item.progress),
+    ready: isRequestReady(item),
+    coverUrl: cover && isPublicCoverUrl(cover) ? cover : coverArtArchiveUrl(albumId),
+    error: item.error_message ?? null,
+  };
+}
+
+export async function listIncomingRequests(needle: DroppedNeedleClient): Promise<IncomingRequest[]> {
+  const [active, history] = await Promise.all([
+    needle.listActiveRequests().catch(() => ({ items: [] as NeedleActiveRequest[] })),
+    needle.listRequestHistory(1, 20).catch(() => ({ items: [] as NeedleActiveRequest[] })),
+  ]);
+  const seen = new Set<string>();
+  const incoming: IncomingRequest[] = [];
+  for (const item of active.items ?? []) {
+    seen.add(requestKey(item));
+    incoming.push(serializeIncoming(needle, item));
+  }
+  let readyCount = 0;
+  for (const item of history.items ?? []) {
+    const key = requestKey(item);
+    if (seen.has(key) || !isRequestReady(item)) continue;
+    seen.add(key);
+    incoming.push(serializeIncoming(needle, item));
+    readyCount += 1;
+    if (readyCount >= 8) break;
+  }
+  return incoming;
 }
