@@ -130,10 +130,10 @@ a {
 
 .login-orbit {
   position: absolute;
-  inset: -16px;
-  border-radius: 28px;
-  border: 2px solid rgb(129 140 248 / 0.18);
-  border-top-color: rgb(88 101 242 / 0.85);
+  inset: -18px;
+  border-radius: 50%;
+  border: 2px solid rgb(129 140 248 / 0.16);
+  border-top-color: rgb(88 101 242 / 0.9);
   animation: spin 9s linear infinite;
 }
 
@@ -193,8 +193,8 @@ a {
 }
 
 .wordmark img {
-  width: 34px;
-  height: 32px;
+  width: 42px;
+  height: 40px;
   object-fit: contain;
 }
 
@@ -386,7 +386,7 @@ a {
   box-shadow: 0 40px 90px rgb(0 0 0 / 0.6);
 }
 
-.artwork img {
+#cover {
   display: block;
   width: 100%;
   height: 100%;
@@ -394,11 +394,11 @@ a {
   transition: opacity 220ms ease;
 }
 
-.artwork img:not([src]) {
+#cover:not([src]) {
   display: none;
 }
 
-.artwork.is-swap img {
+.artwork.is-swap #cover {
   opacity: 0;
 }
 
@@ -427,9 +427,10 @@ a {
 }
 
 .idle-mark img {
-  width: 42%;
+  width: 46%;
   height: auto;
   position: relative;
+  object-fit: contain;
 }
 
 .now-copy {

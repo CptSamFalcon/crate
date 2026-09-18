@@ -28,7 +28,7 @@ coverEl.addEventListener("error", () => {
     return;
   }
   coverEl.removeAttribute("src");
-  coverWrap.classList.remove("has-art");
+  coverWrap.classList.remove("has-art", "is-swap");
   stageEl.classList.remove("has-art");
   ambientEl.removeAttribute("src");
 });
