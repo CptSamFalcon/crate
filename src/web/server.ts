@@ -90,6 +90,7 @@ async function playerStatus(
       ? { ...serializeTrack(player.nowPlaying.track), startedAt: player.nowPlaying.startedAt }
       : null,
     queue: player.upcoming.map(serializeTrack),
+    played: player.previouslyPlayed.map(serializeTrack),
   };
 }
 
@@ -125,6 +126,7 @@ export function startWeb(deps: WebDeps): void {
     channels: [] as { id: string; name: string; memberCount: number; current: boolean; you: boolean }[],
     nowPlaying: null,
     queue: [] as ReturnType<typeof serializeTrack>[],
+    played: [] as ReturnType<typeof serializeTrack>[],
     canControl: false,
   });
   const statusPayload = async (user: SessionUser, refresh = false) => {
