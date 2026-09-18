@@ -291,9 +291,9 @@ a {
 }
 
 .artist-row {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
-  gap: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 18px;
   align-items: start;
 }
 
@@ -306,9 +306,10 @@ a {
   text-align: center;
   cursor: pointer;
   display: grid;
-  grid-template-rows: auto 1.5em;
+  grid-template-rows: auto minmax(2.6em, auto);
   gap: 0;
-  min-width: 0;
+  width: 120px;
+  flex: 0 0 120px;
 }
 
 .artist-card .art-wrap {
@@ -327,8 +328,9 @@ a {
   min-width: 0;
   margin-top: 8px;
   line-height: 1.3;
-  -webkit-line-clamp: 1;
-  line-clamp: 1;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow-wrap: anywhere;
 }
 
 .search-tracks li {
@@ -432,6 +434,7 @@ a {
   line-height: 1.3;
   -webkit-line-clamp: 2;
   line-clamp: 2;
+  overflow-wrap: anywhere;
 }
 
 .album-card > span {

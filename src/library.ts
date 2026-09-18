@@ -233,6 +233,66 @@ function songKey(track: { title: string; artist: string; album: string }): strin
   return `${track.title.toLowerCase()}|${track.artist.toLowerCase()}|${track.album.toLowerCase()}`;
 }
 
+function normalizeArtistName(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .replace(/^(the|a|an)\s+/, "")
+    .trim();
+}
+
+function artistMatchScore(name: string, query: string): number {
+  const n = normalizeArtistName(name);
+  const q = normalizeArtistName(query);
+  if (!n || !q) return 0;
+  if (n === q) return 100;
+  if (n.startsWith(`${q} `)) return 70;
+  if (` ${n} `.includes(` ${q} `)) return 45;
+  if (n.includes(q)) return 20;
+  return 0;
+}
+
+function preferArtist(left: StoredArtist, right: StoredArtist, topId: string | null): StoredArtist {
+  const rank = (artist: StoredArtist) =>
+    (topId && artist.id === topId ? 16 : 0) +
+    (artist.coverUrl ? 8 : 0) +
+    (artist.inLibrary ? 4 : 0) +
+    (artist.nativeId ? 2 : 0) +
+    (artist.mbid ? 1 : 0);
+  const winner = rank(left) >= rank(right) ? left : right;
+  const other = winner === left ? right : left;
+  if (other.inLibrary) winner.inLibrary = true;
+  if (other.nativeId && !winner.nativeId) winner.nativeId = other.nativeId;
+  if (other.mbid && !winner.mbid) winner.mbid = other.mbid;
+  if (other.coverUrl && !winner.coverUrl) winner.coverUrl = other.coverUrl;
+  if (other.disambiguation && !winner.disambiguation) winner.disambiguation = other.disambiguation;
+  if (other.albumCount != null && winner.albumCount == null) winner.albumCount = other.albumCount;
+  return winner;
+}
+
+function pickSearchArtists(artists: StoredArtist[], query: string, topId: string | null): StoredArtist[] {
+  const unique = new Map<string, StoredArtist>();
+  for (const artist of artists) {
+    const key = normalizeArtistName(artist.name);
+    if (!key) continue;
+    const existing = unique.get(key);
+    unique.set(key, existing ? preferArtist(existing, artist, topId) : artist);
+  }
+  const ranked = [...unique.values()]
+    .map((artist) => ({ artist, score: artistMatchScore(artist.name, query) }))
+    .filter((item) => item.score > 0)
+    .sort((left, right) => right.score - left.score || Number(right.artist.inLibrary) - Number(left.artist.inLibrary));
+  if (ranked.length === 0) return [];
+  const best = ranked[0]!.score;
+  const floor = best >= 100 ? 100 : best >= 70 ? 70 : 45;
+  return ranked
+    .filter((item) => item.score >= floor)
+    .slice(0, best >= 100 ? 1 : 3)
+    .map((item) => item.artist);
+}
+
 function collectAlbums(order: StoredAlbum[]): PublicAlbum[] {
   const seen = new Set<string>();
   const playable: PublicAlbum[] = [];
@@ -350,26 +410,11 @@ export async function searchMedia(needle: DroppedNeedleClient, query: string): P
     });
   }
 
-  const artistSeen = new Set<string>();
-  const artistOrder: StoredArtist[] = [];
-  const takeArtist = (id: string | null | undefined) => {
-    if (!id || !foundArtists.has(id)) return;
-    const stored = artistById.get(id);
-    if (!stored || artistSeen.has(stored.id)) return;
-    artistSeen.add(stored.id);
-    artistOrder.push(stored);
-  };
-  takeArtist(catalog.top_artist?.musicbrainz_id);
-  const needleQuery = query.trim().toLowerCase();
-  for (const id of foundArtists) {
-    const artist = artistById.get(id);
-    if (artist?.name.toLowerCase() === needleQuery) takeArtist(id);
-  }
-  for (const artist of nativeArtists) {
-    takeArtist(artist.musicbrainz_artist_id ?? `native-artist:${artist.id}`);
-  }
-  for (const artist of catalog.artists ?? []) takeArtist(artist.musicbrainz_id);
-  for (const id of foundArtists) takeArtist(id);
+  const artistOrder = pickSearchArtists(
+    [...foundArtists].map((id) => artistById.get(id)).filter((artist): artist is StoredArtist => Boolean(artist)),
+    query,
+    catalog.top_artist?.musicbrainz_id ?? null,
+  );
 
   const albumOrder: StoredAlbum[] = [];
   if (catalog.top_album?.musicbrainz_id) {
@@ -409,9 +454,9 @@ export async function searchMedia(needle: DroppedNeedleClient, query: string): P
   }
 
   return {
-    artists: artistOrder.slice(0, 8).map(serializeArtist),
-    albums: collectAlbums(albumOrder).slice(0, 24),
-    tracks: tracks.slice(0, 20),
+    artists: artistOrder.map(serializeArtist),
+    albums: collectAlbums(albumOrder).slice(0, 12),
+    tracks: tracks.slice(0, 8),
   };
 }
 

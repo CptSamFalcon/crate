@@ -264,6 +264,7 @@ function renderSearch(payload) {
       const card = document.createElement("button");
       card.type = "button";
       card.className = "artist-card";
+      card.title = artist.disambiguation ? `${artist.name} (${artist.disambiguation})` : artist.name;
       const art = artist.coverUrl ? `<img src="${escapeHtml(artist.coverUrl)}" alt="">` : "";
       card.innerHTML = `<div class="art-wrap">${art}</div><b>${escapeHtml(artist.name)}</b>`;
       bindCover(card.querySelector("img"));
