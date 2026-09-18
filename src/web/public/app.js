@@ -19,6 +19,7 @@ coverEl.addEventListener("error", () => {
     coverEl.src = `https://coverartarchive.org/release-group/${current.albumMbid}/front-500`;
     return;
   }
+  coverEl.removeAttribute("src");
   coverWrap.classList.remove("has-art");
 });
 coverEl.addEventListener("load", () => {
@@ -164,15 +165,13 @@ function renderAlbums(payload) {
       const card = document.createElement("button");
       card.type = "button";
       card.className = album.inLibrary ? "album-card" : "album-card requestable";
-      const art = album.coverUrl
-        ? `<img src="${escapeHtml(album.coverUrl)}" alt="">`
-        : `<img src="/rou.png" alt="">`;
+      const art = album.coverUrl ? `<img src="${escapeHtml(album.coverUrl)}" alt="">` : "";
       card.innerHTML = `<div class="art-wrap">${art}${albumBadge(album)}</div><b>${escapeHtml(album.title)}</b><span>${escapeHtml(album.artist)}${
         album.matchedTrack ? ` · has ${escapeHtml(album.matchedTrack)}` : album.year ? ` · ${album.year}` : ""
       }</span>`;
       const artImg = card.querySelector("img");
       artImg?.addEventListener("error", () => {
-        artImg.src = "/rou.png";
+        artImg.remove();
       });
       card.addEventListener("click", () => void openAlbumView(album.id));
       resultsEl.append(card);
@@ -230,10 +229,11 @@ async function openAlbumView(albumId) {
     }
     paintAlbumAction();
     const cover = document.querySelector("#album-cover");
-    cover.src = detail.album.coverUrl || "/rou.png";
     cover.onerror = () => {
-      cover.src = "/rou.png";
+      cover.removeAttribute("src");
     };
+    if (detail.album.coverUrl) cover.src = detail.album.coverUrl;
+    else cover.removeAttribute("src");
     albumTracksEl.innerHTML = "";
     for (const [index, track] of detail.tracks.entries()) {
       const item = document.createElement("li");
