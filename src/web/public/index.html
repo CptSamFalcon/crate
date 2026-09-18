@@ -3,124 +3,291 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Rou</title>
-    <link rel="icon" href="/rou.png" />
+    <title>Crate</title>
+    <link rel="icon" href="/brand/crate-favicon.png" type="image/png" />
+    <link rel="apple-touch-icon" href="/brand/crate-icon.png" />
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
+    <svg class="icon-sprite" aria-hidden="true" focusable="false">
+      <symbol id="i-search" viewBox="0 0 24 24">
+        <circle cx="11" cy="11" r="7" />
+        <path d="m20 20-3.5-3.5" />
+      </symbol>
+      <symbol id="i-play" viewBox="0 0 24 24">
+        <path d="M8 5.5v13l11-6.5-11-6.5z" />
+      </symbol>
+      <symbol id="i-pause" viewBox="0 0 24 24">
+        <rect x="6.5" y="5" width="3.5" height="14" rx="1" />
+        <rect x="14" y="5" width="3.5" height="14" rx="1" />
+      </symbol>
+      <symbol id="i-skip" viewBox="0 0 24 24">
+        <path d="M6 5.5v13l9.5-6.5L6 5.5z" />
+        <path d="M18.5 5.5v13" />
+      </symbol>
+      <symbol id="i-stop" viewBox="0 0 24 24">
+        <rect x="6.5" y="6.5" width="11" height="11" rx="2" />
+      </symbol>
+      <symbol id="i-volume" viewBox="0 0 24 24">
+        <path d="M5 10v4h3.2L12 18V6L8.2 10H5z" />
+        <path d="M16 9.2a4.2 4.2 0 0 1 0 5.6" />
+        <path d="M18.3 7a7 7 0 0 1 0 10" />
+      </symbol>
+      <symbol id="i-chevron" viewBox="0 0 24 24">
+        <path d="m6 9 6 6 6-6" />
+      </symbol>
+      <symbol id="i-logout" viewBox="0 0 24 24">
+        <path d="M10 7V5a2 2 0 0 1 2-2h7v18h-7a2 2 0 0 1-2-2v-2" />
+        <path d="M15 12H3" />
+        <path d="m6 9-3 3 3 3" />
+      </symbol>
+      <symbol id="i-expand" viewBox="0 0 24 24">
+        <path d="M9 3H3v6" />
+        <path d="M15 21h6v-6" />
+        <path d="M21 3h-6" />
+        <path d="M21 3v6" />
+        <path d="M3 15v6h6" />
+      </symbol>
+      <symbol id="i-collapse" viewBox="0 0 24 24">
+        <path d="M9 3v6H3" />
+        <path d="M15 21v-6h6" />
+        <path d="M21 9V3h-6" />
+        <path d="M3 15v6h6" />
+      </symbol>
+      <symbol id="i-close" viewBox="0 0 24 24">
+        <path d="M6 6l12 12" />
+        <path d="M18 6 6 18" />
+      </symbol>
+      <symbol id="i-voice" viewBox="0 0 24 24">
+        <path d="M12 3v18" />
+        <path d="M7 8v8" />
+        <path d="M17 8v8" />
+        <path d="M3 11v2" />
+        <path d="M21 11v2" />
+      </symbol>
+      <symbol id="i-people" viewBox="0 0 24 24">
+        <circle cx="9" cy="8" r="3" />
+        <path d="M4 19a5 5 0 0 1 10 0" />
+        <circle cx="17" cy="9" r="2.4" />
+        <path d="M16 19a4 4 0 0 1 4-3.2" />
+      </symbol>
+      <symbol id="i-plus" viewBox="0 0 24 24">
+        <path d="M12 5v14" />
+        <path d="M5 12h14" />
+      </symbol>
+      <symbol id="i-arrow" viewBox="0 0 24 24">
+        <path d="M15 18l-6-6 6-6" />
+      </symbol>
+      <symbol id="i-hash" viewBox="0 0 24 24">
+        <path d="M5 9h14" />
+        <path d="M5 15h14" />
+        <path d="m9.5 4-2 16" />
+        <path d="m16.5 4-2 16" />
+      </symbol>
+    </svg>
+
     <div id="login" class="screen hidden">
       <div class="login-card">
-        <img class="rou-hero" src="/rou.png" alt="Rou" />
-        <p class="eyebrow">DroppedNeedle remote</p>
-        <h1>Rou</h1>
-        <p>Sign in with Discord. Browse any album, queue what’s on the crate, or request what isn’t.</p>
+        <div class="login-mark" aria-hidden="true">
+          <img src="/brand/crate-logo.png" alt="" />
+        </div>
+        <p class="eyebrow">Discord music, your way</p>
+        <h1>Crate</h1>
+        <p class="login-copy">Sign in with Discord. Browse the crate, queue what’s on the media server, or request what isn’t — then play it in voice.</p>
         <p id="login-error" class="error hidden"></p>
-        <a class="btn primary" href="/auth/discord">Continue with Discord</a>
+        <a class="btn primary login-btn" href="/auth/discord">Continue with Discord</a>
       </div>
     </div>
 
     <div id="app" class="app hidden">
-      <header class="mast">
-        <div class="brand">
-          <img class="rou-stamp" src="/rou.png" alt="" />
-          <div>
-            <p class="eyebrow">Rou</p>
-            <strong>Crate</strong>
-          </div>
-        </div>
-        <form id="search-form" class="search">
-          <input id="query" type="search" placeholder="Search any album, artist, or song" maxlength="200" required />
-          <button type="submit" class="btn primary">Search</button>
+      <header class="topbar">
+        <a class="wordmark" href="/" aria-label="Crate home">
+          <img src="/brand/crate-mono.png" alt="" />
+          <span>Crate</span>
+        </a>
+        <form id="search-form" class="search" role="search">
+          <svg class="icon search-icon" aria-hidden="true"><use href="#i-search"></use></svg>
+          <input
+            id="query"
+            type="search"
+            name="q"
+            placeholder="Search artists, albums, or tracks…"
+            maxlength="200"
+            required
+            autocomplete="off"
+            enterkeyhint="search"
+          />
+          <button type="submit" class="sr-only">Search</button>
         </form>
-        <div class="user">
-          <img id="avatar" alt="" width="32" height="32" />
-          <span id="username"></span>
-          <form action="/logout" method="post">
-            <button type="submit">Log out</button>
-          </form>
+        <div class="user-menu" id="user-menu-wrap">
+          <button type="button" class="user-chip" id="user-button" aria-expanded="false" aria-haspopup="menu">
+            <img id="avatar" alt="" width="32" height="32" />
+            <span id="username"></span>
+            <svg class="icon" aria-hidden="true"><use href="#i-chevron"></use></svg>
+          </button>
+          <div class="menu user-dropdown" id="user-menu" hidden role="menu">
+            <form action="/logout" method="post">
+              <button type="submit" role="menuitem">
+                <svg class="icon" aria-hidden="true"><use href="#i-logout"></use></svg>
+                Log out
+              </button>
+            </form>
+          </div>
         </div>
       </header>
 
-      <section class="now" id="now">
-        <div class="cover" id="cover-wrap">
-          <img id="cover" alt="" />
-        </div>
-        <div class="now-meta">
-          <div class="where">
-            <label id="server-picker" class="server-picker hidden">
-              <span>Server</span>
-              <select id="guild"></select>
-            </label>
-            <label id="channel-picker" class="server-picker">
-              <span>Voice</span>
-              <select id="voice-channel">
-                <option value="">Choose a voice channel</option>
-              </select>
-            </label>
-            <p id="channel" class="muted channel">Not in a voice channel</p>
+      <section class="stage" id="stage">
+        <img id="ambient" class="ambient" alt="" />
+        <div class="stage-shade"></div>
+        <div class="stage-grid">
+          <div class="artwork" id="cover-wrap">
+            <img id="cover" alt="" />
+            <div class="idle-mark" aria-hidden="true">
+              <img src="/brand/crate-logo.png" alt="" />
+            </div>
           </div>
-          <h1 id="title">Nothing playing</h1>
-          <p id="artist" class="muted">Search the crate</p>
-          <p id="added-by" class="muted hidden"></p>
-          <button type="button" class="album-link" id="album"></button>
-          <p id="elapsed" class="muted"></p>
-          <div class="transport">
-            <button type="button" data-action="pause" class="btn">Pause</button>
-            <button type="button" data-action="resume" class="btn">Resume</button>
-            <button type="button" data-action="skip" class="btn primary">Skip</button>
-            <button type="button" data-action="stop" class="btn danger">Stop</button>
+
+          <div class="now-copy">
+            <p class="kicker" id="now-eyebrow"></p>
+            <h1 id="title">Nothing playing</h1>
+            <p id="artist" class="now-artist">Search the crate to find music.</p>
+            <p id="added-by" class="now-added hidden"></p>
+            <button type="button" class="album-link" id="album"></button>
+
+            <div class="progress-block">
+              <progress id="progress" max="1000" value="0" aria-label="Playback progress"></progress>
+              <div class="progress-times">
+                <span id="elapsed">0:00</span>
+                <span id="duration">0:00</span>
+              </div>
+            </div>
+
+            <div class="transport-row">
+              <div class="transport" role="group" aria-label="Playback">
+                <button type="button" class="control control-play" id="play-pause" data-action="resume" aria-label="Play" disabled>
+                  <svg class="icon play-icon" aria-hidden="true"><use href="#i-play"></use></svg>
+                  <svg class="icon pause-icon" aria-hidden="true"><use href="#i-pause"></use></svg>
+                </button>
+                <button type="button" class="control" data-action="skip" aria-label="Skip" disabled>
+                  <svg class="icon" aria-hidden="true"><use href="#i-skip"></use></svg>
+                </button>
+                <button type="button" class="control control-stop" data-action="stop" aria-label="Stop" disabled>
+                  <svg class="icon" aria-hidden="true"><use href="#i-stop"></use></svg>
+                </button>
+              </div>
+              <label class="volume">
+                <svg class="icon" aria-hidden="true"><use href="#i-volume"></use></svg>
+                <span class="sr-only">Volume</span>
+                <input id="volume" type="range" min="0" max="150" value="80" />
+                <span id="volume-label">80%</span>
+              </label>
+              <button type="button" class="control control-party" id="party-btn" aria-label="Enter party mode" aria-pressed="false">
+                <svg class="icon party-expand" aria-hidden="true"><use href="#i-expand"></use></svg>
+                <svg class="icon party-collapse" aria-hidden="true"><use href="#i-collapse"></use></svg>
+              </button>
+            </div>
+
+            <div class="connection" id="connection">
+              <div class="picker" id="server-picker">
+                <button type="button" class="picker-btn" id="server-button" aria-haspopup="listbox" aria-expanded="false" aria-label="Discord server">
+                  <img id="server-icon" class="picker-avatar hidden" alt="" />
+                  <span class="picker-copy">
+                    <small>Server</small>
+                    <strong id="server-label">Choose a server</strong>
+                  </span>
+                  <svg class="icon" aria-hidden="true"><use href="#i-chevron"></use></svg>
+                </button>
+                <ul class="menu picker-menu" id="server-menu" hidden role="listbox" aria-label="Discord servers"></ul>
+              </div>
+              <div class="picker" id="channel-picker">
+                <button type="button" class="picker-btn" id="channel-button" aria-haspopup="listbox" aria-expanded="false" aria-label="Voice channel">
+                  <span class="live-dot" id="voice-dot" data-state="off"></span>
+                  <svg class="icon channel-hash" aria-hidden="true"><use href="#i-hash"></use></svg>
+                  <span class="picker-copy">
+                    <small id="voice-state">Disconnected</small>
+                    <strong id="channel-label">Choose a voice channel</strong>
+                  </span>
+                  <span class="member-count hidden" id="member-count"></span>
+                  <svg class="icon" aria-hidden="true"><use href="#i-chevron"></use></svg>
+                </button>
+                <ul class="menu picker-menu" id="channel-menu" hidden role="listbox" aria-label="Voice channels"></ul>
+              </div>
+            </div>
           </div>
-          <label class="volume">
-            <span>Volume</span>
-            <input id="volume" type="range" min="0" max="150" value="80" />
-            <span id="volume-label">80%</span>
-          </label>
+
+          <aside class="rail">
+            <section class="rail-card">
+              <div class="rail-head">
+                <h2>Up next</h2>
+                <span class="rail-count" id="queue-count"></span>
+              </div>
+              <ol id="queue" class="queue-list"></ol>
+            </section>
+            <section class="rail-card">
+              <div class="rail-head">
+                <h2>Requests</h2>
+                <span class="rail-count" id="request-count"></span>
+              </div>
+              <ol id="requests" class="request-list"></ol>
+            </section>
+          </aside>
         </div>
       </section>
 
-      <div class="workspace">
-        <section class="panel crate">
-          <div id="browse">
-            <p id="search-status" class="muted">Search anything. Artists first, then albums, then tracks.</p>
-            <div id="results"></div>
+      <section class="library" id="library">
+        <p id="search-status" class="library-status" aria-live="polite"></p>
+        <div id="search-skeleton" class="skeleton-stack hidden" aria-hidden="true">
+          <div class="skeleton-row"></div>
+          <div class="skeleton-cards">
+            <span></span><span></span><span></span><span></span>
           </div>
-          <div id="artist-view" class="hidden">
-            <button type="button" class="btn" id="artist-back-btn">Back to search</button>
-            <div class="album-hero">
-              <img id="artist-cover" alt="" />
-              <div>
-                <p class="eyebrow">Artist</p>
-                <h2 id="artist-name"></h2>
-                <p id="artist-meta" class="muted"></p>
+          <div class="skeleton-row"></div>
+          <div class="skeleton-row"></div>
+        </div>
+        <div id="browse">
+          <div id="library-empty" class="library-empty">
+            <img class="empty-mark" src="/brand/crate-mono.png" alt="" />
+            <h2>Find something to play</h2>
+            <p>Search artists, albums, or tracks.</p>
+          </div>
+          <div id="results"></div>
+        </div>
+        <div id="artist-view" class="detail-view hidden">
+          <button type="button" class="text-btn" id="artist-back-btn">
+            <svg class="icon" aria-hidden="true"><use href="#i-arrow"></use></svg>
+            Back to search
+          </button>
+          <div class="album-hero">
+            <img id="artist-cover" alt="" />
+            <div>
+              <p class="eyebrow">Artist</p>
+              <h2 id="artist-name"></h2>
+              <p id="artist-meta" class="muted"></p>
+            </div>
+          </div>
+          <div id="artist-albums" class="album-grid"></div>
+        </div>
+        <div id="album-view" class="detail-view hidden">
+          <button type="button" class="text-btn" id="back-btn">
+            <svg class="icon" aria-hidden="true"><use href="#i-arrow"></use></svg>
+            Back
+          </button>
+          <div class="album-hero">
+            <img id="album-cover" alt="" />
+            <div>
+              <p class="eyebrow" id="album-year">Album</p>
+              <h2 id="album-title"></h2>
+              <p id="album-artist" class="muted"></p>
+              <p id="album-matched" class="chip hidden"></p>
+              <p id="album-note" class="muted hidden"></p>
+              <div class="album-actions">
+                <button type="button" class="btn primary" id="queue-album-btn">Queue album</button>
               </div>
             </div>
-            <div id="artist-albums" class="album-grid"></div>
           </div>
-          <div id="album-view" class="hidden">
-            <button type="button" class="btn" id="back-btn">Back</button>
-            <div class="album-hero">
-              <img id="album-cover" alt="" />
-              <div>
-                <p class="eyebrow" id="album-year"></p>
-                <h2 id="album-title"></h2>
-                <p id="album-artist" class="muted"></p>
-                <p id="album-matched" class="chip hidden"></p>
-                <p id="album-note" class="muted hidden"></p>
-                <div class="album-actions">
-                  <button type="button" class="btn primary" id="queue-album-btn">Queue album</button>
-                </div>
-              </div>
-            </div>
-            <ol id="album-tracks" class="tracklist"></ol>
-          </div>
-        </section>
-        <aside class="panel queue-panel">
-          <h2>Queue</h2>
-          <ol id="queue" class="tracklist compact"></ol>
-          <h2>Requests</h2>
-          <ol id="requests" class="tracklist compact request-list"></ol>
-        </aside>
-      </div>
+          <ol id="album-tracks" class="tracklist"></ol>
+        </div>
+      </section>
     </div>
     <script src="/app.js"></script>
   </body>
