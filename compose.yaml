@@ -9,6 +9,7 @@ services:
     environment:
       TZ: UTC
       NODE_OPTIONS: --dns-result-order=ipv4first
+      WEB_PUBLIC_URL: https://rou.samflixplusprime.org
     logging:
       driver: json-file
       options:
