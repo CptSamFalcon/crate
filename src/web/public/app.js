@@ -228,7 +228,7 @@ function renderVoiceState(next) {
     dot.dataset.state = "busy";
   } else if (connected) {
     state.textContent = next.paused ? "Paused" : "Connected";
-    label.textContent = next.channelName || "Voice";
+    label.textContent = channel?.name || next.channelName || "Voice";
     dot.dataset.state = next.paused ? "paused" : "on";
   } else {
     state.textContent = "Disconnected";

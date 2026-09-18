@@ -50,6 +50,16 @@ async function allowedVoices(voices: VoiceBasedChannel[], userId?: string): Prom
   return checks.filter((item) => item.ok).map((item) => item.channel);
 }
 
+export function redactVoiceForMember(
+  channelId: string | null,
+  channelName: string | null,
+  visibleChannelIds: readonly string[],
+): { channelId: string | null; channelName: string | null } {
+  if (!channelId) return { channelId: null, channelName: null };
+  if (visibleChannelIds.includes(channelId)) return { channelId, channelName };
+  return { channelId, channelName: null };
+}
+
 async function voiceChannelsOf(client: Client, guildId: string, refresh = true): Promise<VoiceBasedChannel[]> {
   const guild = client.guilds.cache.get(guildId) ?? (await client.guilds.fetch(guildId));
   const listed = () =>
@@ -74,10 +84,11 @@ export async function listVoiceChannels(
   guildId: string,
   options?: { botChannelId?: string; userId?: string; refresh?: boolean },
 ): Promise<VoiceChannelInfo[]> {
+  if (!options?.userId) return [];
   const guild = client.guilds.cache.get(guildId) ?? (await client.guilds.fetch(guildId));
   const voices = await allowedVoices(
     await voiceChannelsOf(client, guildId, options?.refresh !== false),
-    options?.userId,
+    options.userId,
   );
   const userChannelId = options?.userId ? (guild.voiceStates.cache.get(options.userId)?.channelId ?? null) : null;
   return voices.map((channel) => ({

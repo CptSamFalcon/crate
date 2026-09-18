@@ -8,7 +8,7 @@
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test src/web/auth.test.ts src/web/security.test.ts src/droppedneedle/client.test.ts src/config.test.ts"
+    "test": "tsx --test src/web/auth.test.ts src/web/security.test.ts src/web/voice.test.ts src/droppedneedle/client.test.ts src/config.test.ts"
   },
   "engines": {
     "node": ">=22"

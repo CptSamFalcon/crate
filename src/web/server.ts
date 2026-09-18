@@ -39,7 +39,7 @@ import {
   type SessionUser,
 } from "./auth.js";
 import { clampQuery, isSafeId, limitJsonBody, rateLimit, securityHeaders } from "./security.js";
-import { pickVoiceChannel, listVoiceChannels, listMemberGuilds, memberInGuild } from "./voice.js";
+import { pickVoiceChannel, listVoiceChannels, listMemberGuilds, memberInGuild, redactVoiceForMember } from "./voice.js";
 
 const publicDir = join(dirname(fileURLToPath(import.meta.url)), "public");
 
@@ -77,11 +77,18 @@ async function playerStatus(
     const cached = client.channels.cache.get(channelId);
     channelName = cached && "name" in cached ? String(cached.name) : null;
   }
+  const visible = extra?.channels
+    ? redactVoiceForMember(
+        channelId,
+        channelName,
+        extra.channels.map((channel) => channel.id),
+      )
+    : { channelId, channelName };
   return {
     paused: player.paused,
     volume: player.volumePercent,
-    channelId,
-    channelName,
+    channelId: visible.channelId,
+    channelName: visible.channelName,
     guildId: extra?.guildId,
     guildName: extra?.guildName ?? null,
     guilds: extra?.guilds ?? [],
