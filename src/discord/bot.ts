@@ -143,6 +143,7 @@ async function handleInteraction(
     const queued = toQueueItem(track, interaction.user.displayName);
     const player = players.get(interaction.guildId);
     const position = await player.enqueue(channel, [queued]);
+    players.leaveOthers(interaction.guildId);
     await interaction.reply({
       embeds: [playingEmbed(queued, position === 0 ? "Playing now" : `Queued #${position}`)],
       components: [playbackButtons()],
@@ -164,10 +165,10 @@ async function handleCommand(
 
   switch (interaction.commandName) {
     case "play":
-      await playQuery(interaction, needle, player, "track");
+      await playQuery(interaction, needle, players, player, "track");
       return;
     case "album":
-      await playQuery(interaction, needle, player, "album");
+      await playQuery(interaction, needle, players, player, "album");
       return;
     case "search": {
       const query = interaction.options.getString("query", true);
@@ -226,6 +227,7 @@ async function handleCommand(
 async function playQuery(
   interaction: ChatInputCommandInteraction,
   needle: DroppedNeedleClient,
+  players: PlayerManager,
   player: ReturnType<PlayerManager["get"]>,
   mode: "track" | "album",
 ): Promise<void> {
@@ -251,6 +253,7 @@ async function playQuery(
   const first = queued[0]!;
   await interaction.editReply(`Found **${first.title}** — ${first.artist}. Joining voice…`);
   const position = await player.enqueue(channel, queued);
+  players.leaveOthers(interaction.guildId!);
   const extra =
     queued.length > 1
       ? `${queued.length} tracks from *${first.album}*`

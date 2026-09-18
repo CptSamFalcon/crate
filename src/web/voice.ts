@@ -1,26 +1,81 @@
-import { ChannelType, type Client, type VoiceBasedChannel } from "discord.js";
+import { ChannelType, PermissionFlagsBits, type Client, type VoiceBasedChannel } from "discord.js";
+
+export type VoiceChannelInfo = {
+  id: string;
+  name: string;
+  memberCount: number;
+  current: boolean;
+  you: boolean;
+};
+
+export type PickVoiceOptions = {
+  preferredChannelId?: string;
+  currentChannelId?: string;
+  userId?: string;
+  allowEmptyFallback?: boolean;
+};
+
+async function voiceChannelsOf(client: Client, guildId: string, refresh = true): Promise<VoiceBasedChannel[]> {
+  const guild = client.guilds.cache.get(guildId) ?? (await client.guilds.fetch(guildId));
+  if (refresh || guild.channels.cache.size === 0) await guild.channels.fetch();
+  return [...guild.channels.cache.values()]
+    .filter((channel): channel is VoiceBasedChannel => {
+      if (!channel.isVoiceBased()) return false;
+      if (channel.type === ChannelType.GuildStageVoice) return false;
+      if (channel.id === guild.afkChannelId) return false;
+      const me = guild.members.me;
+      if (me && !channel.permissionsFor(me)?.has(PermissionFlagsBits.Connect)) return false;
+      return true;
+    })
+    .sort((left, right) => {
+      const position = left.rawPosition - right.rawPosition;
+      return position !== 0 ? position : left.name.localeCompare(right.name);
+    });
+}
+
+export async function listVoiceChannels(
+  client: Client,
+  guildId: string,
+  options?: { botChannelId?: string; userId?: string; refresh?: boolean },
+): Promise<VoiceChannelInfo[]> {
+  const guild = client.guilds.cache.get(guildId) ?? (await client.guilds.fetch(guildId));
+  const voices = await voiceChannelsOf(client, guildId, options?.refresh !== false);
+  const userChannelId = options?.userId ? (guild.voiceStates.cache.get(options.userId)?.channelId ?? null) : null;
+  return voices.map((channel) => ({
+    id: channel.id,
+    name: channel.name,
+    memberCount: channel.members.filter((member) => !member.user.bot).size,
+    current: channel.id === options?.botChannelId,
+    you: Boolean(userChannelId && channel.id === userChannelId),
+  }));
+}
 
 export async function pickVoiceChannel(
   client: Client,
   guildId: string,
-  currentChannelId?: string,
+  options: PickVoiceOptions = {},
 ): Promise<VoiceBasedChannel | null> {
   const guild = client.guilds.cache.get(guildId) ?? (await client.guilds.fetch(guildId));
-  await guild.channels.fetch();
+  const voices = await voiceChannelsOf(client, guildId, true);
+  const byId = (id?: string) => (id ? (voices.find((channel) => channel.id === id) ?? null) : null);
 
-  if (currentChannelId) {
-    const current = guild.channels.cache.get(currentChannelId);
-    if (current?.isVoiceBased()) return current;
+  const preferred = byId(options.preferredChannelId);
+  if (preferred) return preferred;
+
+  if (options.userId) {
+    const yours = byId(guild.voiceStates.cache.get(options.userId)?.channelId ?? undefined);
+    if (yours) return yours;
   }
 
-  const voices = [...guild.channels.cache.values()].filter((channel): channel is VoiceBasedChannel => {
-    return (
-      channel.isVoiceBased() &&
-      channel.type !== ChannelType.GuildStageVoice &&
-      channel.id !== guild.afkChannelId
-    );
-  });
+  const current = byId(options.currentChannelId);
+  if (current) return current;
+
+  if (voices.length === 1) return voices[0] ?? null;
+
   const occupied = voices.find((channel) => channel.members.some((member) => !member.user.bot));
+  if (occupied && options.allowEmptyFallback !== false) return occupied;
+
+  if (options.allowEmptyFallback === false) return null;
   return occupied ?? voices[0] ?? null;
 }
 

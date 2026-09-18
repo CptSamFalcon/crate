@@ -81,7 +81,7 @@ If this machine already has a tunnel (for example DroppedNeedle), you can skip t
 
 Then **Deploy** (or **Update**) the Dockge stack. Rou logs `web UI on :8787` when the dashboard is enabled. The tunnel logs `Registered tunnel connection` when Cloudflare is up.
 
-`CLIENT_SECRET` is the OAuth2 client secret for the same Discord application as the bot. Sign-in is limited to members of a server Rou is in. `GUILD_ID` is the default crate server; if Rou is in more than one, pick the server on the dashboard. Slash commands register in every server Rou joins. Playback from the browser stays in the current voice channel, or joins a populated one, then the first joinable channel.
+`CLIENT_SECRET` is the OAuth2 client secret for the same Discord application as the bot. Sign-in is limited to members of a server Rou is in. `GUILD_ID` is the default crate server; if Rou is in more than one, pick the server on the dashboard. Slash commands register in every server Rou joins. Playback stays in the voice channel you pick, or the one you're in.
 
 ## Local run
 

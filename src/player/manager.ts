@@ -201,6 +201,13 @@ export class GuildPlayer {
     this.notify();
   }
 
+  async moveTo(channel: VoiceBasedChannel): Promise<void> {
+    return this.withLock(async () => {
+      await this.ensureConnected(channel);
+      this.notify();
+    });
+  }
+
   private resetPlayback(): QueueItem[] {
     const tracks = [...(this.current ? [this.current.track] : []), ...this.queue];
     this.stopped = true;
@@ -386,6 +393,12 @@ export class PlayerManager {
     created.onStatus(() => this.emit());
     this.players.set(guildId, created);
     return created;
+  }
+
+  leaveOthers(exceptGuildId: string): void {
+    for (const [guildId, player] of this.players) {
+      if (guildId !== exceptGuildId) player.leave();
+    }
   }
 
   onStatus(listener: StatusListener): () => void {

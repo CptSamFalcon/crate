@@ -196,7 +196,7 @@ a {
   border-radius: 999px;
   padding: 6px 28px 6px 12px;
   font: inherit;
-  max-width: min(100%, 240px);
+  max-width: min(100%, 260px);
   cursor: pointer;
 }
 
@@ -492,7 +492,12 @@ a {
 }
 
 .tracklist.compact li {
-  grid-template-columns: 1fr auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
+.tracklist.compact .btn {
+  padding: 4px 10px;
+  font-size: 12px;
 }
 
 .tracklist.search-tracks li {
@@ -517,7 +522,10 @@ a {
 }
 
 .request-list li {
-  grid-template-columns: 1fr auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
+.request-list li[data-album-id] {
   cursor: pointer;
 }
 

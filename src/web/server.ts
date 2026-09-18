@@ -37,7 +37,7 @@ import {
   writeSession,
   type SessionUser,
 } from "./auth.js";
-import { pickVoiceChannel, listBotGuilds, memberInGuild } from "./voice.js";
+import { pickVoiceChannel, listVoiceChannels, listBotGuilds, memberInGuild } from "./voice.js";
 
 const publicDir = join(dirname(fileURLToPath(import.meta.url)), "public");
 
@@ -62,7 +62,12 @@ async function publicFile(name: string, type: string): Promise<Response> {
 async function playerStatus(
   client: Client,
   player: GuildPlayer,
-  extra?: { guildId: string; guildName: string | null; guilds: { id: string; name: string; iconUrl: string | null; active: boolean }[] },
+  extra?: {
+    guildId: string;
+    guildName: string | null;
+    guilds: { id: string; name: string; iconUrl: string | null; active: boolean }[];
+    channels: { id: string; name: string; memberCount: number; current: boolean; you: boolean }[];
+  },
 ) {
   const channelId = player.channelId ?? null;
   let channelName: string | null = null;
@@ -78,6 +83,7 @@ async function playerStatus(
     guildId: extra?.guildId,
     guildName: extra?.guildName ?? null,
     guilds: extra?.guilds ?? [],
+    channels: extra?.channels ?? [],
     nowPlaying: player.nowPlaying
       ? { ...serializeTrack(player.nowPlaying.track), startedAt: player.nowPlaying.startedAt }
       : null,
@@ -103,6 +109,10 @@ export function startWeb(deps: WebDeps): void {
       guildId: activeGuildId,
       guildName: guild?.name ?? null,
       guilds: listBotGuilds(client).map((item) => ({ ...item, active: item.id === activeGuildId })),
+      channels: await listVoiceChannels(client, activeGuildId, {
+        botChannelId: player.channelId,
+        refresh: false,
+      }),
     });
   };
 
@@ -207,10 +217,14 @@ export function startWeb(deps: WebDeps): void {
       return c.json({ error: miss.message, catalog: miss.catalog }, 404);
     }
     const player = currentPlayer();
-    const channel = await pickVoiceChannel(client, activeGuildId, player.channelId);
+    const channel = await pickVoiceChannel(client, activeGuildId, {
+      currentChannelId: player.channelId,
+      userId: user.id,
+    });
     if (!channel) return c.json({ error: "No voice channel available for Rou to join." }, 409);
     const queued = tracks.map((track) => toQueueItem(track!, displayName(user)));
     const position = await player.enqueue(channel, queued);
+    players.leaveOthers(activeGuildId);
     return c.json({
       position,
       track: serializeTrack(queued[0]!),
@@ -232,10 +246,14 @@ export function startWeb(deps: WebDeps): void {
       return c.json({ error: miss.message, catalog: miss.catalog }, 404);
     }
     const player = currentPlayer();
-    const channel = await pickVoiceChannel(client, activeGuildId, player.channelId);
+    const channel = await pickVoiceChannel(client, activeGuildId, {
+      currentChannelId: player.channelId,
+      userId: user.id,
+    });
     if (!channel) return c.json({ error: "No voice channel available for Rou to join." }, 409);
     const queued = tracks.map((track) => toQueueItem(track, displayName(user)));
     const position = await player.enqueue(channel, queued);
+    players.leaveOthers(activeGuildId);
     return c.json({
       position,
       count: queued.length,
@@ -265,6 +283,7 @@ export function startWeb(deps: WebDeps): void {
       const watch = { ...result.watch, requestedBy: displayName(user) };
       requestors.set(watch.key, watch.requestedBy);
       waiting.set(watch.key, watch);
+      dismissed.delete(watch.key);
     }
     return c.json(result);
   });
@@ -272,7 +291,7 @@ export function startWeb(deps: WebDeps): void {
   api.get("/requests", async (c) => {
     const snapshot = await listIncomingRequests(needle);
     const items = snapshot.active
-      .filter((item) => !item.ready && !item.failed)
+      .filter((item) => !item.ready && !item.failed && !dismissed.has(`${item.kind}:${item.id}`))
       .map((item) => ({
         ...item,
         requestedBy: requestors.get(`${item.kind}:${item.id}`) ?? item.requestedBy,
@@ -280,38 +299,139 @@ export function startWeb(deps: WebDeps): void {
     return c.json({ items });
   });
 
+  api.post("/requests/remove", async (c) => {
+    const body = (await c.req.json().catch(() => ({}))) as { id?: string; kind?: string };
+    const id = body.id?.trim() ?? "";
+    const kind = body.kind === "track" ? "track" : "album";
+    if (!id) return c.json({ error: "Missing request" }, 400);
+    const key = `${kind}:${id}`;
+    waiting.delete(key);
+    dismissed.add(key);
+    try {
+      await needle.cancelRequest(id, kind);
+    } catch (error) {
+      console.warn("[rou] cancel request failed:", error);
+      try {
+        await needle.rejectRequest(id, kind);
+      } catch (rejectError) {
+        console.warn("[rou] reject request failed:", rejectError);
+      }
+    }
+    const snapshot = await listIncomingRequests(needle);
+    const items = snapshot.active
+      .filter((item) => !item.ready && !item.failed && !dismissed.has(`${item.kind}:${item.id}`))
+      .map((item) => ({
+        ...item,
+        requestedBy: requestors.get(`${item.kind}:${item.id}`) ?? item.requestedBy,
+      }));
+    return c.json({ ok: true, items });
+  });
+
+  api.get("/channels", async (c) => {
+    const user = c.get("user") as SessionUser;
+    const guildId = c.req.query("guildId")?.trim() || activeGuildId;
+    if (!(await memberInGuild(client, guildId, user.id))) {
+      return c.json({ error: "You're not in that server." }, 403);
+    }
+    const player = players.get(guildId);
+    return c.json({
+      guildId,
+      channels: await listVoiceChannels(client, guildId, {
+        botChannelId: player.channelId,
+        userId: user.id,
+      }),
+    });
+  });
+
+  api.post("/channel", async (c) => {
+    const user = c.get("user") as SessionUser;
+    const body = (await c.req.json().catch(() => ({}))) as { channelId?: string };
+    const channelId = body.channelId?.trim() ?? "";
+    if (!channelId) return c.json({ error: "Missing voice channel" }, 400);
+    const channel = await pickVoiceChannel(client, activeGuildId, {
+      preferredChannelId: channelId,
+      userId: user.id,
+      allowEmptyFallback: false,
+    });
+    if (!channel || channel.id !== channelId) {
+      return c.json({ error: "Rou can't join that voice channel." }, 409);
+    }
+    await currentPlayer().moveTo(channel);
+    players.leaveOthers(activeGuildId);
+    return c.json({ ok: true, status: await statusPayload() });
+  });
+
+  api.post("/queue/remove", async (c) => {
+    const body = (await c.req.json().catch(() => ({}))) as { index?: number };
+    const index = Number(body.index);
+    const removed = currentPlayer().removeQueued(index);
+    if (!removed) return c.json({ error: "Nothing at that queue position." }, 404);
+    return c.json({ ok: true, removed: serializeTrack(removed), status: await statusPayload() });
+  });
+
   api.post("/guild", async (c) => {
     const user = c.get("user") as SessionUser;
-    const body = (await c.req.json().catch(() => ({}))) as { guildId?: string };
+    const body = (await c.req.json().catch(() => ({}))) as { guildId?: string; channelId?: string };
     const guildId = body.guildId?.trim() ?? "";
     if (!guildId) return c.json({ error: "Missing server" }, 400);
     if (!(await memberInGuild(client, guildId, user.id))) {
       return c.json({ error: "You're not in that server." }, 403);
     }
-    if (guildId === activeGuildId) return c.json({ ok: true, status: await statusPayload() });
+    if (guildId === activeGuildId) {
+      const channelId = body.channelId?.trim();
+      if (channelId) {
+        const channel = await pickVoiceChannel(client, guildId, {
+          preferredChannelId: channelId,
+          allowEmptyFallback: false,
+        });
+        if (!channel || channel.id !== channelId) {
+          return c.json({ error: "Rou can't join that voice channel." }, 409);
+        }
+        await currentPlayer().moveTo(channel);
+        players.leaveOthers(activeGuildId);
+      }
+      return c.json({ ok: true, status: await statusPayload() });
+    }
 
     const from = currentPlayer();
     const previousId = activeGuildId;
     const moving = Boolean(from.nowPlaying || from.upcoming.length);
-    const channel = moving ? await pickVoiceChannel(client, guildId) : null;
+    const destChannels = await listVoiceChannels(client, guildId, { userId: user.id });
+    const channel = await pickVoiceChannel(client, guildId, {
+      preferredChannelId: body.channelId?.trim(),
+      userId: user.id,
+      allowEmptyFallback: false,
+    });
     if (moving && !channel) {
-      return c.json({ error: "No voice channel available in that server." }, 409);
+      return c.json(
+        {
+          error: "Pick a voice channel in that server, or join one there first.",
+          guildId,
+          channels: destChannels,
+        },
+        409,
+      );
     }
+
     const session = from.copySession();
-    activeGuildId = guildId;
-    const to = currentPlayer();
+    const to = players.get(guildId);
+    if (to.channelId || !to.isIdle()) to.leave();
     to.setVolume(session.volume);
-    if (session.tracks.length > 0) from.pause();
+    if (moving) from.pause();
+    activeGuildId = guildId;
     try {
-      if (session.tracks.length > 0 && channel) {
+      if (moving && channel) {
         await to.enqueue(channel, session.tracks);
+      } else if (channel) {
+        await to.moveTo(channel);
       }
     } catch (error) {
       activeGuildId = previousId;
+      to.leave();
       from.resume();
       throw error;
     }
-    if (from.guildId !== to.guildId) from.leave();
+    players.leaveOthers(guildId);
     return c.json({ ok: true, status: await statusPayload() });
   });
 
@@ -323,6 +443,7 @@ export function startWeb(deps: WebDeps): void {
   api.post("/resume", (c) => c.json({ ok: currentPlayer().resume() }));
   api.post("/stop", (c) => {
     currentPlayer().stop();
+    players.leaveOthers(activeGuildId);
     return c.json({ ok: true });
   });
   api.post("/volume", async (c) => {
@@ -401,6 +522,7 @@ function displayName(user: SessionUser): string {
 
 const waiting = new Map<string, IncomingWatch>();
 const requestors = new Map<string, string>();
+const dismissed = new Set<string>();
 
 async function playIncoming(
   deps: { client: Client; guildId: string; player: GuildPlayer; needle: DroppedNeedleClient },
@@ -408,7 +530,9 @@ async function playIncoming(
 ): Promise<boolean> {
   const tracks = await tracksForIncoming(deps.needle, watch);
   if (tracks.length === 0) return false;
-  const channel = await pickVoiceChannel(deps.client, deps.guildId, deps.player.channelId);
+  const channel = await pickVoiceChannel(deps.client, deps.guildId, {
+    currentChannelId: deps.player.channelId,
+  });
   if (!channel) return false;
   await deps.player.enqueue(
     channel,
@@ -429,6 +553,10 @@ async function syncIncoming(deps: {
   let moved = false;
 
   for (const [key, watch] of [...waiting]) {
+    if (dismissed.has(key)) {
+      waiting.delete(key);
+      continue;
+    }
     const live = byKey.get(key) ?? historyByKey.get(key);
     if (live && live.failed) {
       waiting.delete(key);
@@ -447,6 +575,7 @@ async function syncIncoming(deps: {
 
   const items = snapshot.active.filter((item) => {
     const key = `${item.kind}:${item.id}`;
+    if (dismissed.has(key)) return false;
     if (waiting.has(key)) return true;
     return !item.ready && !item.failed;
   });

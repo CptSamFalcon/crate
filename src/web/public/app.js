@@ -40,6 +40,7 @@ let openAlbum = null;
 let openArtist = null;
 let albumReturn = "browse";
 let requestPoll = 0;
+let pendingGuildId = null;
 
 function formatDuration(seconds) {
   if (!seconds || seconds <= 0) return "?:??";
@@ -77,7 +78,12 @@ async function api(path, options) {
     throw new Error("Unauthorized");
   }
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.error || `Request failed (${response.status})`);
+  if (!response.ok) {
+    const error = new Error(data.error || `Request failed (${response.status})`);
+    error.status = response.status;
+    error.payload = data;
+    throw error;
+  }
   return data;
 }
 
@@ -106,6 +112,7 @@ function renderStatus(next) {
   albumBtn.textContent = current?.album ?? "";
   albumBtn.dataset.albumId = current?.albumMbid ?? "";
   renderGuildPicker(next);
+  if (!pendingGuildId) renderChannelPicker(next.channels ?? [], next.channelId);
   const place = next.channelName
     ? `${next.paused ? "Paused in" : "Live in"} ${next.channelName}`
     : "Not in a voice channel";
@@ -130,12 +137,18 @@ function renderStatus(next) {
   if (!current && next.queue.length === 0) {
     queueEl.innerHTML = `<li class="muted">Queue is empty.</li>`;
   } else {
-    for (const track of next.queue) {
+    next.queue.forEach((track, index) => {
       const item = document.createElement("li");
       const who = track.requestedBy ? `<small class="muted">Added by ${escapeHtml(track.requestedBy)}</small>` : "";
       item.innerHTML = `<span>${escapeHtml(track.title)}${who}</span><span class="muted">${formatDuration(track.durationSeconds)}</span>`;
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "btn";
+      remove.textContent = "Remove";
+      remove.addEventListener("click", () => void removeQueued(index, remove));
+      item.append(remove);
       queueEl.append(item);
-    }
+    });
   }
   tickElapsed();
 }
@@ -156,8 +169,43 @@ function renderGuildPicker(next) {
       .join("");
     select.dataset.signature = signature;
   }
-  if (document.activeElement !== select) {
+  if (document.activeElement !== select && !pendingGuildId) {
     select.value = next.guildId;
+  }
+}
+
+function channelLabel(channel) {
+  const bits = [];
+  if (channel.current) bits.push("Rou");
+  if (channel.you) bits.push("you");
+  if (channel.memberCount) bits.push(`${channel.memberCount}`);
+  return bits.length ? `${channel.name} (${bits.join(", ")})` : channel.name;
+}
+
+function renderChannelPicker(channels, selectedId) {
+  const picker = document.querySelector("#channel-picker");
+  const select = document.querySelector("#voice-channel");
+  if (!channels.length && !pendingGuildId) {
+    picker.classList.add("hidden");
+    select.innerHTML = "";
+    delete select.dataset.signature;
+    return;
+  }
+  picker.classList.remove("hidden");
+  const signature = `${pendingGuildId || ""}:${channels.map((channel) => channel.id).join(",")}`;
+  if (select.dataset.signature !== signature) {
+    const placeholder = pendingGuildId ? "Pick a voice channel…" : "Choose a channel";
+    select.innerHTML = `<option value="">${placeholder}</option>${channels
+      .map(
+        (channel) =>
+          `<option value="${escapeHtml(channel.id)}">${escapeHtml(channelLabel(channel))}</option>`,
+      )
+      .join("")}`;
+    select.dataset.signature = signature;
+  }
+  if (document.activeElement !== select) {
+    const current = selectedId || "";
+    select.value = current && channels.some((channel) => channel.id === current) ? current : "";
   }
 }
 
@@ -179,8 +227,20 @@ function renderRequests(items) {
     if (item.albumId) row.dataset.albumId = item.albumId;
     const who = item.requestedBy ? `<small class="muted">Requested by ${escapeHtml(item.requestedBy)}</small>` : "";
     row.innerHTML = `<span>${escapeHtml(item.title)}<small class="muted"> ${escapeHtml(item.artist)}</small>${who}</span><span class="${requestStatusClass(item)}">${escapeHtml(item.statusLabel)}</span>`;
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "btn";
+    remove.textContent = "Remove";
+    remove.addEventListener("click", (event) => {
+      event.stopPropagation();
+      void removeRequest(item, remove);
+    });
+    row.append(remove);
     if (item.albumId) {
-      row.addEventListener("click", () => void openAlbumView(item.albumId));
+      row.addEventListener("click", (event) => {
+        if (event.target.closest("button")) return;
+        void openAlbumView(item.albumId);
+      });
     }
     requestsEl.append(row);
   }
@@ -192,6 +252,36 @@ async function loadRequests() {
     renderRequests(payload.items ?? []);
   } catch {
     // Keep the last list if DroppedNeedle is briefly unreachable.
+  }
+}
+
+async function removeQueued(index, button) {
+  if (button) button.disabled = true;
+  try {
+    const result = await api("/api/queue/remove", {
+      method: "POST",
+      body: JSON.stringify({ index }),
+    });
+    if (result.status) renderStatus(result.status);
+    searchStatus.textContent = "Removed from the queue.";
+  } catch (error) {
+    if (button) button.disabled = false;
+    searchStatus.textContent = error.message;
+  }
+}
+
+async function removeRequest(item, button) {
+  if (button) button.disabled = true;
+  try {
+    const result = await api("/api/requests/remove", {
+      method: "POST",
+      body: JSON.stringify({ id: item.id, kind: item.kind }),
+    });
+    renderRequests(result.items ?? []);
+    searchStatus.textContent = "Removed from Requests.";
+  } catch (error) {
+    if (button) button.disabled = false;
+    searchStatus.textContent = error.message;
   }
 }
 
@@ -555,18 +645,71 @@ document.querySelector("#album").addEventListener("click", () => {
 document.querySelector("#guild").addEventListener("change", async (event) => {
   const select = event.target;
   const guildId = select.value;
-  if (!guildId || guildId === status?.guildId || select.dataset.moving === "1") return;
+  if (!guildId || select.dataset.moving === "1") return;
+  if (pendingGuildId && guildId === status?.guildId) {
+    pendingGuildId = null;
+    renderChannelPicker(status.channels ?? [], status.channelId);
+    searchStatus.textContent = "Staying put.";
+    return;
+  }
+  if (!pendingGuildId && guildId === status?.guildId) return;
   select.dataset.moving = "1";
   select.disabled = true;
   searchStatus.textContent = "Moving Rou…";
   try {
-    const result = await api("/api/guild", { method: "POST", body: JSON.stringify({ guildId }) });
+    const dest = await api(`/api/channels?guildId=${encodeURIComponent(guildId)}`);
+    const yours = dest.channels?.find((channel) => channel.you);
+    const result = await api("/api/guild", {
+      method: "POST",
+      body: JSON.stringify({ guildId, channelId: yours?.id }),
+    });
+    pendingGuildId = null;
     if (result.status) renderStatus(result.status);
     searchStatus.textContent = result.status?.guildName
       ? `Rou is in ${result.status.guildName}.`
       : "Moved.";
   } catch (error) {
-    if (status?.guildId) select.value = status.guildId;
+    if (error.status === 409 && error.payload?.channels) {
+      pendingGuildId = error.payload.guildId || guildId;
+      renderChannelPicker(error.payload.channels, "");
+      searchStatus.textContent = error.message;
+    } else {
+      pendingGuildId = null;
+      if (status?.guildId) select.value = status.guildId;
+      searchStatus.textContent = error.message;
+    }
+  } finally {
+    select.dataset.moving = "0";
+    select.disabled = false;
+  }
+});
+
+document.querySelector("#voice-channel").addEventListener("change", async (event) => {
+  const select = event.target;
+  const channelId = select.value;
+  if (!channelId || select.dataset.moving === "1") return;
+  if (!pendingGuildId && channelId === status?.channelId) return;
+  select.dataset.moving = "1";
+  select.disabled = true;
+  searchStatus.textContent = pendingGuildId ? "Moving Rou…" : "Joining voice…";
+  try {
+    const result = pendingGuildId
+      ? await api("/api/guild", {
+          method: "POST",
+          body: JSON.stringify({ guildId: pendingGuildId, channelId }),
+        })
+      : await api("/api/channel", {
+          method: "POST",
+          body: JSON.stringify({ channelId }),
+        });
+    pendingGuildId = null;
+    if (result.status) renderStatus(result.status);
+    searchStatus.textContent = result.status?.channelName
+      ? `Rou is in ${result.status.channelName}.`
+      : "Joined.";
+  } catch (error) {
+    if (status?.channelId) select.value = status.channelId;
+    else select.value = "";
     searchStatus.textContent = error.message;
   } finally {
     select.dataset.moving = "0";
