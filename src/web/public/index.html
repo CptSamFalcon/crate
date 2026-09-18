@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Rou</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div id="login" class="screen hidden">
+      <div class="login-card">
+        <p class="eyebrow">DroppedNeedle remote</p>
+        <h1>Rou</h1>
+        <p>Sign in with Discord to search the library and control the queue. Audio still plays in the voice channel.</p>
+        <p id="login-error" class="error hidden"></p>
+        <a class="btn primary" href="/auth/discord">Continue with Discord</a>
+      </div>
+    </div>
+
+    <div id="app" class="screen hidden">
+      <header class="top">
+        <div>
+          <p class="eyebrow">Rou</p>
+          <h1>Now playing</h1>
+        </div>
+        <div class="user">
+          <img id="avatar" alt="" width="32" height="32" />
+          <span id="username"></span>
+          <a href="/logout">Log out</a>
+        </div>
+      </header>
+
+      <section class="now">
+        <div class="cover" id="cover-wrap">
+          <img id="cover" alt="" />
+          <div class="cover-fallback" id="cover-fallback">Rou</div>
+        </div>
+        <div class="now-meta">
+          <p id="channel" class="muted">Not in a voice channel</p>
+          <h2 id="title">Nothing playing</h2>
+          <p id="artist" class="muted">Search your library to start</p>
+          <p id="album"></p>
+          <p id="elapsed" class="muted"></p>
+          <div class="transport">
+            <button type="button" data-action="pause" class="btn">Pause</button>
+            <button type="button" data-action="resume" class="btn">Resume</button>
+            <button type="button" data-action="skip" class="btn primary">Skip</button>
+            <button type="button" data-action="stop" class="btn danger">Stop</button>
+          </div>
+          <label class="volume">
+            Volume
+            <input id="volume" type="range" min="0" max="150" value="80" />
+            <span id="volume-label">80%</span>
+          </label>
+        </div>
+      </section>
+
+      <section class="panel">
+        <form id="search-form">
+          <input id="query" type="search" placeholder="Song, artist, or album" maxlength="200" required />
+          <button type="submit" class="btn">Search</button>
+          <button type="button" class="btn primary" id="play-btn">Play</button>
+          <button type="button" class="btn" id="album-btn">Queue album</button>
+        </form>
+        <p id="search-status" class="muted"></p>
+        <ul id="results" class="list"></ul>
+      </section>
+
+      <section class="panel">
+        <h2>Queue</h2>
+        <ul id="queue" class="list"></ul>
+      </section>
+    </div>
+    <script src="/app.js"></script>
+  </body>
+</html>

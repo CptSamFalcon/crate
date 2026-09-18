@@ -4,6 +4,7 @@ services:
     container_name: rou-bot
     restart: unless-stopped
     network_mode: host
+    # Host mode also publishes the optional dashboard on WEB_PORT (default 8787).
     env_file: .env
     environment:
       TZ: UTC

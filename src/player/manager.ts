@@ -27,6 +27,8 @@ export type NowPlaying = {
 
 const MAX_QUEUE = 200;
 
+type StatusListener = () => void;
+
 export class GuildPlayer {
   readonly player: AudioPlayer;
   private connection: VoiceConnection | undefined;
@@ -36,6 +38,7 @@ export class GuildPlayer {
   private starting = false;
   private volume = 0.8;
   private transcode: TranscodeSession | undefined;
+  private readonly statusListeners = new Set<StatusListener>();
 
   constructor(
     readonly guildId: string,
@@ -52,6 +55,15 @@ export class GuildPlayer {
       if (this.stopped || this.starting) return;
       void this.advance();
     });
+    this.player.on(AudioPlayerStatus.Playing, () => this.notify());
+    this.player.on(AudioPlayerStatus.Paused, () => this.notify());
+  }
+
+  onStatus(listener: StatusListener): () => void {
+    this.statusListeners.add(listener);
+    return () => {
+      this.statusListeners.delete(listener);
+    };
   }
 
   get nowPlaying(): NowPlaying | undefined {
@@ -64,6 +76,19 @@ export class GuildPlayer {
 
   get size(): number {
     return this.queue.length + (this.current ? 1 : 0);
+  }
+
+  get paused(): boolean {
+    return this.player.state.status === AudioPlayerStatus.Paused;
+  }
+
+  get volumePercent(): number {
+    return Math.round(this.volume * 100);
+  }
+
+  get channelId(): string | undefined {
+    if (this.connection?.state.status !== VoiceConnectionStatus.Ready) return undefined;
+    return this.connection.joinConfig.channelId ?? undefined;
   }
 
   isIdle(): boolean {
@@ -82,6 +107,8 @@ export class GuildPlayer {
       if (!started) {
         throw new Error(`Found ${tracks[0]?.title ?? "a track"} but could not start the audio stream`);
       }
+    } else {
+      this.notify();
     }
     return startNow ? 0 : this.queue.length - tracks.length + 1;
   }
@@ -89,15 +116,20 @@ export class GuildPlayer {
   skip(): QueueItem | undefined {
     const skipped = this.current?.track;
     this.player.stop(true);
+    this.notify();
     return skipped;
   }
 
   pause(): boolean {
-    return this.player.pause(true);
+    const paused = this.player.pause(true);
+    if (paused) this.notify();
+    return paused;
   }
 
   resume(): boolean {
-    return this.player.unpause();
+    const resumed = this.player.unpause();
+    if (resumed) this.notify();
+    return resumed;
   }
 
   setVolume(percent: number): void {
@@ -109,6 +141,7 @@ export class GuildPlayer {
         ? this.player.state.resource
         : undefined;
     resource?.volume?.setVolume(this.volume);
+    this.notify();
   }
 
   stop(): void {
@@ -121,6 +154,11 @@ export class GuildPlayer {
     this.connection?.destroy();
     this.connection = undefined;
     this.stopped = false;
+    this.notify();
+  }
+
+  private notify(): void {
+    for (const listener of this.statusListeners) listener();
   }
 
   private async ensureConnected(channel: VoiceBasedChannel): Promise<void> {
@@ -143,6 +181,7 @@ export class GuildPlayer {
     this.connection.on("stateChange", (oldState, newState) => {
       if (oldState.status !== newState.status) {
         console.log(`[rou] voice ${oldState.status} -> ${newState.status}`);
+        this.notify();
       }
     });
     console.log(`[rou] joining voice channel ${channel.id}`);
@@ -151,6 +190,7 @@ export class GuildPlayer {
     } catch (error) {
       this.connection.destroy();
       this.connection = undefined;
+      this.notify();
       throw new Error(
         "Discord voice never became ready. Need DAVE encryption (@discordjs/voice 0.19) and outbound UDP (network_mode: host).",
         { cause: error },
@@ -158,12 +198,14 @@ export class GuildPlayer {
     }
     this.connection.subscribe(this.player);
     console.log("[rou] voice ready");
+    this.notify();
   }
 
   private async advance(): Promise<boolean> {
     const next = this.queue.shift();
     if (!next) {
       this.current = undefined;
+      this.notify();
       return false;
     }
     try {
@@ -192,6 +234,7 @@ export class GuildPlayer {
     resource.volume?.setVolume(this.volume);
     this.starting = true;
     this.current = { track, startedAt: Date.now() };
+    this.notify();
     try {
       this.player.play(resource);
       await entersState(this.player, AudioPlayerStatus.Playing, 20_000);

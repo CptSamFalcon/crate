@@ -5,6 +5,7 @@ import { generateDependencyReport } from "@discordjs/voice";
 import { loadConfig } from "./config.js";
 import { DroppedNeedleClient } from "./droppedneedle/client.js";
 import { createBot } from "./discord/bot.js";
+import { startWeb } from "./web/server.js";
 
 try {
   await import("@snazzah/davey");
@@ -38,17 +39,23 @@ const user = await needle.connect();
 console.log(`[rou] DroppedNeedle ok as ${user.display_name} (${user.role}) @ ${config.droppedNeedleUrl}`);
 console.log(generateDependencyReport());
 
-const bot = createBot({
+const { client, players } = createBot({
   token: config.DISCORD_TOKEN,
   clientId: config.DISCORD_CLIENT_ID,
   guildId: config.DISCORD_GUILD_ID,
   needle,
 });
 
-await bot.login(config.DISCORD_TOKEN);
+await client.login(config.DISCORD_TOKEN);
+
+if (config.web) {
+  startWeb({ config, web: config.web, client, players, needle });
+} else if (config.WEB_PUBLIC_URL || config.DISCORD_CLIENT_SECRET) {
+  console.warn("[rou] web UI disabled: set WEB_PUBLIC_URL, CLIENT_SECRET, and GUILD_ID");
+}
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.on(signal, () => {
-    void bot.destroy().then(() => process.exit(0));
+    void client.destroy().then(() => process.exit(0));
   });
 }

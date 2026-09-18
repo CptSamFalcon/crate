@@ -9,7 +9,8 @@ import {
 } from "discord.js";
 import type { DroppedNeedleClient } from "../droppedneedle/client.js";
 import type { PlayableTrack } from "../droppedneedle/types.js";
-import { PlayerManager, type QueueItem } from "../player/manager.js";
+import { findAlbum, findTracks, missingLibraryMessage, toQueueItem } from "../library.js";
+import { PlayerManager } from "../player/manager.js";
 import {
   playbackButtons,
   playingEmbed,
@@ -23,12 +24,17 @@ import { registerSlashCommands } from "./registerCommands.js";
 
 const searchCache = new Map<string, PlayableTrack[]>();
 
+export type RouBot = {
+  client: Client;
+  players: PlayerManager;
+};
+
 export function createBot(options: {
   token: string;
   clientId?: string;
   guildId?: string;
   needle: DroppedNeedleClient;
-}) {
+}): RouBot {
   const players = new PlayerManager(options.needle);
   const client = new Client({
     intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates],
@@ -58,7 +64,7 @@ export function createBot(options: {
     }
   });
 
-  return client;
+  return { client, players };
 }
 
 async function handleInteraction(
@@ -234,68 +240,6 @@ async function playQuery(
     embeds: [playingEmbed(first, extra)],
     components: [playbackButtons()],
   });
-}
-
-async function findTracks(
-  needle: DroppedNeedleClient,
-  query: string,
-  firstOnly = false,
-): Promise<PlayableTrack[]> {
-  const local = await needle.searchLibrary(query);
-  const localTracks = (local.tracks ?? []).map((track) => needle.toPlayable(track));
-  if (localTracks.length > 0) {
-    return firstOnly ? localTracks.slice(0, 1) : localTracks;
-  }
-  if (local.albums && local.albums.length > 0) {
-    const album = local.albums[0]!;
-    const albumTracks = await needle.getAlbumTracks(album.musicbrainz_id);
-    const playable = albumTracks.map((track) => needle.albumToPlayable(album, track));
-    if (playable.length > 0) return playable;
-  }
-  const nativeTracks = await needle.searchNativeTracks(query, firstOnly ? 5 : 25);
-  const resolved = await needle.playableFromNative(nativeTracks);
-  return firstOnly ? resolved.slice(0, 1) : resolved;
-}
-
-async function findAlbum(needle: DroppedNeedleClient, query: string): Promise<PlayableTrack[]> {
-  const local = await needle.searchLibrary(query);
-  const album = local.albums?.[0];
-  if (album) {
-    const albumTracks = await needle.getAlbumTracks(album.musicbrainz_id);
-    const playable = albumTracks.map((track) => needle.albumToPlayable(album, track));
-    if (playable.length > 0) return playable;
-  }
-  const nativeAlbums = await needle.searchNativeAlbums(query);
-  const nativeAlbum = nativeAlbums[0];
-  if (!nativeAlbum) return [];
-  const nativeTracks = await needle.getNativeAlbumTracks(nativeAlbum.id);
-  return needle.playableFromNative(nativeTracks);
-}
-
-async function missingLibraryMessage(needle: DroppedNeedleClient, query: string): Promise<string> {
-  try {
-    const catalog = await needle.searchCatalog(query);
-    const albums = (catalog.albums ?? []).slice(0, 3);
-    if (albums.length === 0) {
-      return `Nothing in the DroppedNeedle library matched **${query}**.`;
-    }
-    const lines = albums.map((album) => {
-      const owned = album.in_library ? "in library" : "not downloaded";
-      return `• ${album.title}${album.artist ? ` — ${album.artist}` : ""} (${owned})`;
-    });
-    return [
-      `Nothing playable in the library matched **${query}**.`,
-      "Catalogue hits:",
-      ...lines,
-      "Request it in DroppedNeedle, then run `/play` again once it imports.",
-    ].join("\n");
-  } catch {
-    return `Nothing in the DroppedNeedle library matched **${query}**.`;
-  }
-}
-
-function toQueueItem(track: PlayableTrack, requestedBy: string): QueueItem {
-  return { ...track, requestedBy };
 }
 
 function cacheKey(guildId: string, userId: string): string {

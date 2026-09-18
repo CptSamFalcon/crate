@@ -168,6 +168,21 @@ export class DroppedNeedleClient {
     return response.body;
   }
 
+  isLocalUrl(url: string): boolean {
+    try {
+      return new URL(url).origin === new URL(this.baseUrl).origin;
+    } catch {
+      return false;
+    }
+  }
+
+  async fetchMedia(url: string): Promise<Response> {
+    if (!this.isLocalUrl(url)) {
+      throw new DroppedNeedleError("Refusing to fetch media off the DroppedNeedle host");
+    }
+    return this.request(url, { method: "GET" }, true);
+  }
+
   toPlayable(track: CrateTrack): PlayableTrack {
     return {
       fileId: track.track_file_id,
