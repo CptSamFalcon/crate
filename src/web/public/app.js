@@ -112,6 +112,11 @@ function renderStatus(next) {
   albumBtn.textContent = current?.album ?? "";
   albumBtn.dataset.albumId = current?.albumMbid ?? "";
   renderGuildPicker(next);
+  const locked = next.canControl === false;
+  document.querySelector(".transport").querySelectorAll("button").forEach((button) => {
+    button.disabled = locked;
+  });
+  volumeInput.disabled = locked;
   if (!pendingGuildId) renderChannelPicker(next.channels ?? [], next.channelId);
   const place = next.channelName
     ? `${next.paused ? "Paused in" : "Live in"} ${next.channelName}`
@@ -157,20 +162,21 @@ function renderGuildPicker(next) {
   const picker = document.querySelector("#server-picker");
   const select = document.querySelector("#guild");
   const guilds = next.guilds ?? [];
-  if (guilds.length < 2) {
+  if (guilds.length < 2 && next.canControl !== false) {
     picker.classList.add("hidden");
     return;
   }
   picker.classList.remove("hidden");
-  const signature = guilds.map((guild) => guild.id).join(",");
+  const signature = `${next.canControl === false ? "take:" : ""}${guilds.map((guild) => guild.id).join(",")}`;
   if (select.dataset.signature !== signature) {
-    select.innerHTML = guilds
-      .map((guild) => `<option value="${escapeHtml(guild.id)}">${escapeHtml(guild.name)}</option>`)
-      .join("");
+    const placeholder = next.canControl === false ? `<option value="">Bring Rou here…</option>` : "";
+    select.innerHTML =
+      placeholder +
+      guilds.map((guild) => `<option value="${escapeHtml(guild.id)}">${escapeHtml(guild.name)}</option>`).join("");
     select.dataset.signature = signature;
   }
   if (document.activeElement !== select && !pendingGuildId) {
-    select.value = next.guildId;
+    select.value = next.guildId || "";
   }
 }
 

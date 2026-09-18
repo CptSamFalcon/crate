@@ -33,6 +33,23 @@ function botCanConnect(channel: VoiceBasedChannel): boolean {
   return permissions.has(PermissionFlagsBits.Connect);
 }
 
+export async function memberCanJoin(channel: VoiceBasedChannel, userId: string): Promise<boolean> {
+  try {
+    const member = channel.guild.members.cache.get(userId) ?? (await channel.guild.members.fetch(userId));
+    const permissions = channel.permissionsFor(member);
+    if (!permissions) return false;
+    return permissions.has(PermissionFlagsBits.ViewChannel) && permissions.has(PermissionFlagsBits.Connect);
+  } catch {
+    return false;
+  }
+}
+
+async function allowedVoices(voices: VoiceBasedChannel[], userId?: string): Promise<VoiceBasedChannel[]> {
+  if (!userId) return voices;
+  const checks = await Promise.all(voices.map(async (channel) => ({ channel, ok: await memberCanJoin(channel, userId) })));
+  return checks.filter((item) => item.ok).map((item) => item.channel);
+}
+
 async function voiceChannelsOf(client: Client, guildId: string, refresh = true): Promise<VoiceBasedChannel[]> {
   const guild = client.guilds.cache.get(guildId) ?? (await client.guilds.fetch(guildId));
   const listed = () =>
@@ -58,7 +75,10 @@ export async function listVoiceChannels(
   options?: { botChannelId?: string; userId?: string; refresh?: boolean },
 ): Promise<VoiceChannelInfo[]> {
   const guild = client.guilds.cache.get(guildId) ?? (await client.guilds.fetch(guildId));
-  const voices = await voiceChannelsOf(client, guildId, options?.refresh !== false);
+  const voices = await allowedVoices(
+    await voiceChannelsOf(client, guildId, options?.refresh !== false),
+    options?.userId,
+  );
   const userChannelId = options?.userId ? (guild.voiceStates.cache.get(options.userId)?.channelId ?? null) : null;
   return voices.map((channel) => ({
     id: channel.id,
@@ -75,11 +95,11 @@ export async function pickVoiceChannel(
   options: PickVoiceOptions = {},
 ): Promise<VoiceBasedChannel | null> {
   const guild = client.guilds.cache.get(guildId) ?? (await client.guilds.fetch(guildId));
-  const voices = await voiceChannelsOf(client, guildId, true);
+  const voices = await allowedVoices(await voiceChannelsOf(client, guildId, true), options.userId);
   const byId = (id?: string) => (id ? (voices.find((channel) => channel.id === id) ?? null) : null);
 
   const preferred = byId(options.preferredChannelId);
-  if (preferred) return preferred;
+  if (options.preferredChannelId) return preferred;
 
   if (options.userId) {
     const yours = byId(guild.voiceStates.cache.get(options.userId)?.channelId ?? undefined);
@@ -116,4 +136,13 @@ export function listBotGuilds(client: Client): { id: string; name: string; iconU
       iconUrl: guild.iconURL({ size: 64 }),
     }))
     .sort((left, right) => left.name.localeCompare(right.name));
+}
+
+export async function listMemberGuilds(
+  client: Client,
+  userId: string,
+): Promise<{ id: string; name: string; iconUrl: string | null }[]> {
+  const guilds = listBotGuilds(client);
+  const flags = await Promise.all(guilds.map((guild) => memberInGuild(client, guild.id, userId)));
+  return guilds.filter((_, index) => flags[index]);
 }

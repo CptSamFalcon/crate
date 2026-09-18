@@ -66,12 +66,44 @@ export function droppedNeedleMessage(error: unknown, fallback = "DroppedNeedle r
 
 export function isPublicCoverUrl(url: string): boolean {
   try {
-    const host = new URL(url).hostname;
+    const parsed = new URL(url);
+    if (parsed.protocol !== "https:") return false;
+    const host = parsed.hostname.toLowerCase();
     return (
       host === "coverartarchive.org" ||
       host.endsWith(".coverartarchive.org") ||
       host === "archive.org" ||
       host.endsWith(".archive.org")
+    );
+  } catch {
+    return false;
+  }
+}
+
+export function isSafeImageContentType(value: string): boolean {
+  const type = value.split(";")[0]?.trim().toLowerCase() ?? "";
+  return (
+    type === "image/jpeg" ||
+    type === "image/jpg" ||
+    type === "image/png" ||
+    type === "image/gif" ||
+    type === "image/webp" ||
+    type === "image/avif" ||
+    type === "application/octet-stream"
+  );
+}
+
+export function isAllowedCoverUrl(url: string, baseUrl: string): boolean {
+  if (isPublicCoverUrl(url)) return true;
+  try {
+    const parsed = new URL(url);
+    const base = new URL(baseUrl);
+    if (parsed.origin !== base.origin) return false;
+    const path = parsed.pathname;
+    if (path.includes("\0") || path.includes("..")) return false;
+    return (
+      /^\/api\/v1\/covers\/[A-Za-z0-9_-]+\/[^/]+$/.test(path) ||
+      /^\/api\/v1\/library\/albums\/[^/]+\/artwork(?:\/cached)?$/.test(path)
     );
   } catch {
     return false;
@@ -335,19 +367,34 @@ export class DroppedNeedleClient {
   }
 
   async fetchCover(url: string): Promise<Response> {
-    if (this.isLocalUrl(url)) {
-      return this.request(url, { method: "GET" }, true);
-    }
-    if (!isPublicCoverUrl(url)) {
+    if (!isAllowedCoverUrl(url, this.baseUrl)) {
       throw new DroppedNeedleError("Refusing to fetch media off the DroppedNeedle host");
+    }
+    if (this.isLocalUrl(url)) {
+      const response = await this.request(url, { method: "GET", redirect: "error" }, true);
+      if (!isAllowedCoverUrl(response.url || url, this.baseUrl)) {
+        throw new DroppedNeedleError("Refusing to fetch media off the DroppedNeedle host");
+      }
+      const contentType = response.headers.get("content-type") ?? "";
+      if (contentType && !isSafeImageContentType(contentType)) {
+        throw new DroppedNeedleError("Cover fetch did not return an image");
+      }
+      return response;
     }
     const response = await fetch(url, {
       headers: { Accept: "image/*,*/*", "User-Agent": "RouDiscordBot/0.1" },
       redirect: "follow",
       signal: AbortSignal.timeout(15_000),
     });
+    if (!isAllowedCoverUrl(response.url, this.baseUrl)) {
+      throw new DroppedNeedleError("Refusing to follow cover redirect off an allowed host");
+    }
     if (!response.ok || !response.body) {
       throw new DroppedNeedleError(`Cover fetch failed (${response.status})`, response.status);
+    }
+    const contentType = response.headers.get("content-type") ?? "";
+    if (contentType && !isSafeImageContentType(contentType)) {
+      throw new DroppedNeedleError("Cover fetch did not return an image");
     }
     return response;
   }

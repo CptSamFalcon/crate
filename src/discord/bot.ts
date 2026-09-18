@@ -77,7 +77,7 @@ export function createBot(options: {
       await handleInteraction(interaction, options.needle, players);
     } catch (error) {
       console.error("[rou] interaction failed:", error);
-      const message = error instanceof Error ? error.message : "Something went wrong.";
+      const message = "Something went wrong.";
       if (interaction.isRepliable() && !interaction.replied && !interaction.deferred) {
         await interaction.reply({ content: message, flags: MessageFlags.Ephemeral }).catch(() => undefined);
       } else if (interaction.isRepliable()) {
