@@ -23,6 +23,7 @@ services:
     environment:
       TZ: UTC
       NODE_OPTIONS: --dns-result-order=ipv4first
+      WEB_PUBLIC_URL: https://rou.samflixplusprime.org
   tunnel:
     image: cloudflare/cloudflared:latest
     container_name: crate-tunnel
@@ -60,7 +61,7 @@ If another bot is still using the same Discord token, stop it first.
 The dashboard is off until these are set:
 
 ```env
-WEB_PUBLIC_URL=https://crate.yourdomain
+WEB_PUBLIC_URL=https://rou.samflixplusprime.org
 WEB_PORT=8787
 CLIENT_SECRET=
 GUILD_ID=
@@ -74,11 +75,11 @@ If this machine already has a tunnel (for example DroppedNeedle), you can skip t
 
 1. Cloudflare Zero Trust → **Networks** → **Tunnels** → **Create a tunnel** → Cloudflared.
 2. Copy the token into `CLOUDFLARE_TUNNEL_TOKEN`.
-3. **Public hostname**: `crate.yourdomain` → type HTTP → URL `http://127.0.0.1:8787`.
+3. **Public hostname**: `rou.samflixplusprime.org` → type HTTP → URL `http://127.0.0.1:8787`.
 4. Save. Cloudflare will create the DNS record.
 5. In the Discord Developer Portal, add this exact redirect:
 
-`https://crate.yourdomain/auth/callback`
+`https://rou.samflixplusprime.org/auth/callback`
 
 Then **Deploy** (or **Update**) the Dockge stack. Crate logs `web UI on http://127.0.0.1:8787` when the dashboard is enabled. The tunnel logs `Registered tunnel connection` when Cloudflare is up.
 
