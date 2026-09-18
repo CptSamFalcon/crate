@@ -31,7 +31,7 @@ coverEl.addEventListener("load", () => {
 
 const LOGIN_ERRORS = {
   oauth: "Discord login failed. Try again.",
-  not_in_guild: "That Discord account is not in this server.",
+  not_in_guild: "That Discord account is not in a server with Rou.",
 };
 
 let status = null;
@@ -105,9 +105,12 @@ function renderStatus(next) {
   const albumBtn = document.querySelector("#album");
   albumBtn.textContent = current?.album ?? "";
   albumBtn.dataset.albumId = current?.albumMbid ?? "";
-  document.querySelector("#channel").textContent = next.channelName
+  renderGuildPicker(next);
+  const place = next.channelName
     ? `${next.paused ? "Paused in" : "Live in"} ${next.channelName}`
     : "Not in a voice channel";
+  const suffix = next.guildName && (next.guilds?.length ?? 0) < 2 ? ` · ${next.guildName}` : "";
+  document.querySelector("#channel").textContent = `${place}${suffix}`;
 
   const nextSrc = current?.coverUrl || "";
   if (!nextSrc) {
@@ -135,6 +138,27 @@ function renderStatus(next) {
     }
   }
   tickElapsed();
+}
+
+function renderGuildPicker(next) {
+  const picker = document.querySelector("#server-picker");
+  const select = document.querySelector("#guild");
+  const guilds = next.guilds ?? [];
+  if (guilds.length < 2) {
+    picker.classList.add("hidden");
+    return;
+  }
+  picker.classList.remove("hidden");
+  const signature = guilds.map((guild) => guild.id).join(",");
+  if (select.dataset.signature !== signature) {
+    select.innerHTML = guilds
+      .map((guild) => `<option value="${escapeHtml(guild.id)}">${escapeHtml(guild.name)}</option>`)
+      .join("");
+    select.dataset.signature = signature;
+  }
+  if (document.activeElement !== select) {
+    select.value = next.guildId;
+  }
 }
 
 function requestStatusClass(item) {
@@ -523,6 +547,21 @@ document.querySelector("#queue-album-btn").addEventListener("click", () => void 
 document.querySelector("#album").addEventListener("click", () => {
   const id = document.querySelector("#album").dataset.albumId;
   if (id) void openAlbumView(id, "browse");
+});
+document.querySelector("#guild").addEventListener("change", async (event) => {
+  const guildId = event.target.value;
+  if (!guildId || guildId === status?.guildId) return;
+  searchStatus.textContent = "Moving Rou…";
+  try {
+    const result = await api("/api/guild", { method: "POST", body: JSON.stringify({ guildId }) });
+    if (result.status) renderStatus(result.status);
+    searchStatus.textContent = result.status?.guildName
+      ? `Rou is in ${result.status.guildName}.`
+      : "Moved.";
+  } catch (error) {
+    if (status?.guildId) event.target.value = status.guildId;
+    searchStatus.textContent = error.message;
+  }
 });
 
 document.querySelector(".transport").addEventListener("click", async (event) => {

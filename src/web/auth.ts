@@ -111,6 +111,7 @@ export async function completeOAuth(
   web: WebConfig,
   clientId: string,
   code: string,
+  allowedGuildIds: Iterable<string> = [],
 ): Promise<{ user: SessionUser } | { error: string }> {
   const body = new URLSearchParams({
     client_id: clientId,
@@ -140,7 +141,9 @@ export async function completeOAuth(
   }
   const profile = (await userResponse.json()) as DiscordUser;
   const guilds = (await guildsResponse.json()) as DiscordGuild[] | { message?: string };
-  if (!Array.isArray(guilds) || !guilds.some((guild) => guild.id === web.guildId)) {
+  const allowed = new Set(allowedGuildIds);
+  if (web.guildId) allowed.add(web.guildId);
+  if (!Array.isArray(guilds) || !guilds.some((guild) => allowed.has(guild.id))) {
     return { error: "not_in_guild" };
   }
   return {

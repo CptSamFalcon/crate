@@ -42,12 +42,34 @@ export function createBot(options: {
 
   client.once(Events.ClientReady, async (ready) => {
     console.log(`[rou] logged in as ${ready.user.tag}`);
-    await registerSlashCommands({
-      token: options.token,
-      clientId: options.clientId ?? ready.user.id,
-      guildId: options.guildId,
-      commands: slashCommands,
-    });
+    const clientId = options.clientId ?? ready.user.id;
+    for (const guild of ready.guilds.cache.values()) {
+      try {
+        await registerSlashCommands({
+          token: options.token,
+          clientId,
+          guildId: guild.id,
+          commands: slashCommands,
+        });
+      } catch (error) {
+        console.warn(`[rou] could not register commands in ${guild.name}:`, error);
+      }
+    }
+  });
+
+  client.on(Events.GuildCreate, async (guild) => {
+    const clientId = options.clientId ?? client.user?.id;
+    if (!clientId) return;
+    try {
+      await registerSlashCommands({
+        token: options.token,
+        clientId,
+        guildId: guild.id,
+        commands: slashCommands,
+      });
+    } catch (error) {
+      console.warn(`[rou] could not register commands in ${guild.name}:`, error);
+    }
   });
 
   client.on(Events.InteractionCreate, async (interaction) => {

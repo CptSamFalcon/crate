@@ -36,7 +36,7 @@ import {
   writeSession,
   type SessionUser,
 } from "./auth.js";
-import { pickVoiceChannel } from "./voice.js";
+import { pickVoiceChannel, listBotGuilds, memberInGuild } from "./voice.js";
 
 const publicDir = join(dirname(fileURLToPath(import.meta.url)), "public");
 
@@ -58,7 +58,11 @@ async function publicFile(name: string, type: string): Promise<Response> {
   });
 }
 
-async function playerStatus(client: Client, player: GuildPlayer) {
+async function playerStatus(
+  client: Client,
+  player: GuildPlayer,
+  extra?: { guildId: string; guildName: string | null; guilds: { id: string; name: string; iconUrl: string | null; active: boolean }[] },
+) {
   const channelId = player.channelId ?? null;
   let channelName: string | null = null;
   if (channelId) {
@@ -70,6 +74,9 @@ async function playerStatus(client: Client, player: GuildPlayer) {
     volume: player.volumePercent,
     channelId,
     channelName,
+    guildId: extra?.guildId,
+    guildName: extra?.guildName ?? null,
+    guilds: extra?.guilds ?? [],
     nowPlaying: player.nowPlaying
       ? { ...serializeTrack(player.nowPlaying.track), startedAt: player.nowPlaying.startedAt }
       : null,
@@ -86,7 +93,17 @@ export function startWeb(deps: WebDeps): void {
   }
 
   const app = new Hono();
-  const player = players.get(web.guildId);
+  let activeGuildId = web.guildId;
+  const currentPlayer = () => players.get(activeGuildId);
+  const statusPayload = async () => {
+    const player = currentPlayer();
+    const guild = client.guilds.cache.get(activeGuildId);
+    return playerStatus(client, player, {
+      guildId: activeGuildId,
+      guildName: guild?.name ?? null,
+      guilds: listBotGuilds(client).map((item) => ({ ...item, active: item.id === activeGuildId })),
+    });
+  };
 
   app.use("/api/*", async (c, next) => {
     if (["POST", "PUT", "PATCH", "DELETE"].includes(c.req.method) && !originAllowed(c.req.header("origin"), web.publicUrl)) {
@@ -111,7 +128,7 @@ export function startWeb(deps: WebDeps): void {
     if (!consumeOAuthState(c, web, state) || !code) {
       return c.redirect("/?error=oauth");
     }
-    const result = await completeOAuth(web, clientId, code);
+    const result = await completeOAuth(web, clientId, code, client.guilds.cache.keys());
     if ("error" in result) {
       return c.redirect(`/?error=${encodeURIComponent(result.error)}`);
     }
@@ -129,15 +146,15 @@ export function startWeb(deps: WebDeps): void {
 
   api.get("/me", (c) => c.json(c.get("user")));
 
-  api.get("/status", async (c) => c.json(await playerStatus(client, player)));
+  api.get("/status", async (c) => c.json(await statusPayload()));
 
   api.get("/events", async (c) => {
     return streamSSE(c, async (stream) => {
       const send = async () => {
-        await stream.writeSSE({ data: JSON.stringify(await playerStatus(client, player)) });
+        await stream.writeSSE({ data: JSON.stringify(await statusPayload()) });
       };
       await send();
-      const stop = player.onStatus(() => {
+      const stop = players.onStatus(() => {
         void send();
       });
       try {
@@ -188,14 +205,15 @@ export function startWeb(deps: WebDeps): void {
       const miss = await missingLibrary(needle, query || "that track");
       return c.json({ error: miss.message, catalog: miss.catalog }, 404);
     }
-    const channel = await pickVoiceChannel(client, web.guildId, player.channelId);
+    const player = currentPlayer();
+    const channel = await pickVoiceChannel(client, activeGuildId, player.channelId);
     if (!channel) return c.json({ error: "No voice channel available for Rou to join." }, 409);
     const queued = tracks.map((track) => toQueueItem(track!, displayName(user)));
     const position = await player.enqueue(channel, queued);
     return c.json({
       position,
       track: serializeTrack(queued[0]!),
-      status: await playerStatus(client, player),
+      status: await statusPayload(),
     });
   });
 
@@ -212,7 +230,8 @@ export function startWeb(deps: WebDeps): void {
       const miss = await missingLibrary(needle, query || "that album");
       return c.json({ error: miss.message, catalog: miss.catalog }, 404);
     }
-    const channel = await pickVoiceChannel(client, web.guildId, player.channelId);
+    const player = currentPlayer();
+    const channel = await pickVoiceChannel(client, activeGuildId, player.channelId);
     if (!channel) return c.json({ error: "No voice channel available for Rou to join." }, 409);
     const queued = tracks.map((track) => toQueueItem(track, displayName(user)));
     const position = await player.enqueue(channel, queued);
@@ -220,7 +239,7 @@ export function startWeb(deps: WebDeps): void {
       position,
       count: queued.length,
       track: serializeTrack(queued[0]!),
-      status: await playerStatus(client, player),
+      status: await statusPayload(),
     });
   });
 
@@ -260,22 +279,48 @@ export function startWeb(deps: WebDeps): void {
     return c.json({ items });
   });
 
+  api.post("/guild", async (c) => {
+    const user = c.get("user") as SessionUser;
+    const body = (await c.req.json().catch(() => ({}))) as { guildId?: string };
+    const guildId = body.guildId?.trim() ?? "";
+    if (!guildId) return c.json({ error: "Missing server" }, 400);
+    if (!(await memberInGuild(client, guildId, user.id))) {
+      return c.json({ error: "You're not in that server." }, 403);
+    }
+    if (guildId === activeGuildId) return c.json({ ok: true, status: await statusPayload() });
+
+    const from = currentPlayer();
+    const moving = Boolean(from.nowPlaying || from.upcoming.length);
+    const channel = moving ? await pickVoiceChannel(client, guildId) : null;
+    if (moving && !channel) {
+      return c.json({ error: "No voice channel available in that server." }, 409);
+    }
+    const session = await from.takeSession();
+    activeGuildId = guildId;
+    const to = currentPlayer();
+    to.setVolume(session.volume);
+    if (session.tracks.length > 0 && channel) {
+      await to.enqueue(channel, session.tracks);
+    }
+    return c.json({ ok: true, status: await statusPayload() });
+  });
+
   api.post("/skip", (c) => {
-    const skipped = player.skip();
+    const skipped = currentPlayer().skip();
     return c.json({ skipped: skipped ? serializeTrack(skipped) : null });
   });
-  api.post("/pause", (c) => c.json({ ok: player.pause() }));
-  api.post("/resume", (c) => c.json({ ok: player.resume() }));
+  api.post("/pause", (c) => c.json({ ok: currentPlayer().pause() }));
+  api.post("/resume", (c) => c.json({ ok: currentPlayer().resume() }));
   api.post("/stop", (c) => {
-    player.stop();
+    currentPlayer().stop();
     return c.json({ ok: true });
   });
   api.post("/volume", async (c) => {
     const body = (await c.req.json().catch(() => ({}))) as { percent?: number };
     const percent = Number(body.percent);
     if (!Number.isFinite(percent)) return c.json({ error: "Missing percent" }, 400);
-    player.setVolume(percent);
-    return c.json({ volume: player.volumePercent });
+    currentPlayer().setVolume(percent);
+    return c.json({ volume: currentPlayer().volumePercent });
   });
 
   api.get("/cover", async (c) => {
@@ -343,12 +388,12 @@ const waiting = new Map<string, IncomingWatch>();
 const requestors = new Map<string, string>();
 
 async function playIncoming(
-  deps: { client: Client; web: WebConfig; player: GuildPlayer; needle: DroppedNeedleClient },
+  deps: { client: Client; guildId: string; player: GuildPlayer; needle: DroppedNeedleClient },
   watch: IncomingWatch,
 ): Promise<boolean> {
   const tracks = await tracksForIncoming(deps.needle, watch);
   if (tracks.length === 0) return false;
-  const channel = await pickVoiceChannel(deps.client, deps.web.guildId, deps.player.channelId);
+  const channel = await pickVoiceChannel(deps.client, deps.guildId, deps.player.channelId);
   if (!channel) return false;
   await deps.player.enqueue(
     channel,
@@ -359,7 +404,7 @@ async function playIncoming(
 
 async function syncIncoming(deps: {
   client: Client;
-  web: WebConfig;
+  guildId: string;
   player: GuildPlayer;
   needle: DroppedNeedleClient;
 }): Promise<{ items: Awaited<ReturnType<typeof listIncomingRequests>>["active"]; moved: boolean }> {

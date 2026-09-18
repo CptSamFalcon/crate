@@ -15,7 +15,7 @@ export async function registerSlashCommands(options: {
     await rest.put(Routes.applicationGuildCommands(options.clientId, options.guildId), {
       body: options.commands,
     });
-    console.log(`[rou] registered ${options.commands.length} guild commands`);
+    console.log(`[rou] registered ${options.commands.length} commands in ${options.guildId}`);
     return;
   }
   await rest.put(Routes.applicationCommands(options.clientId), { body: options.commands });

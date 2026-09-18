@@ -153,6 +153,21 @@ export class GuildPlayer {
   }
 
   stop(): void {
+    this.resetPlayback();
+    this.notify();
+  }
+
+  async takeSession(): Promise<{ tracks: QueueItem[]; volume: number }> {
+    return this.withLock(async () => {
+      const volume = this.volumePercent;
+      const tracks = this.resetPlayback();
+      this.notify();
+      return { tracks, volume };
+    });
+  }
+
+  private resetPlayback(): QueueItem[] {
+    const tracks = [...(this.current ? [this.current.track] : []), ...this.queue];
     this.stopped = true;
     this.queue.length = 0;
     this.current = undefined;
@@ -162,7 +177,7 @@ export class GuildPlayer {
     this.destroyConnection(this.connection);
     this.connection = undefined;
     this.stopped = false;
-    this.notify();
+    return tracks;
   }
 
   private notify(): void {
@@ -320,6 +335,7 @@ export class GuildPlayer {
 
 export class PlayerManager {
   private readonly players = new Map<string, GuildPlayer>();
+  private readonly listeners = new Set<StatusListener>();
 
   constructor(private readonly needle: DroppedNeedleClient) {}
 
@@ -327,7 +343,19 @@ export class PlayerManager {
     const existing = this.players.get(guildId);
     if (existing) return existing;
     const created = new GuildPlayer(guildId, this.needle);
+    created.onStatus(() => this.emit());
     this.players.set(guildId, created);
     return created;
+  }
+
+  onStatus(listener: StatusListener): () => void {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
+  private emit(): void {
+    for (const listener of this.listeners) listener();
   }
 }

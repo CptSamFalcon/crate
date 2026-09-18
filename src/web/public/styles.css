@@ -173,6 +173,33 @@ a {
   max-width: 100%;
 }
 
+.where {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: end;
+  margin-bottom: 4px;
+}
+
+.server-picker {
+  display: grid;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.server-picker select {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: #120d0b;
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 6px 28px 6px 12px;
+  font: inherit;
+  max-width: min(100%, 240px);
+  cursor: pointer;
+}
+
 .now-meta {
   min-width: 0;
 }

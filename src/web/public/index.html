@@ -44,7 +44,13 @@
           <img id="cover" alt="" />
         </div>
         <div class="now-meta">
-          <p id="channel" class="muted channel">Not in a voice channel</p>
+          <div class="where">
+            <label id="server-picker" class="server-picker hidden">
+              <span>Server</span>
+              <select id="guild"></select>
+            </label>
+            <p id="channel" class="muted channel">Not in a voice channel</p>
+          </div>
           <h1 id="title">Nothing playing</h1>
           <p id="artist" class="muted">Search the crate</p>
           <p id="added-by" class="muted hidden"></p>
