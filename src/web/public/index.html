@@ -144,33 +144,7 @@
           </div>
 
           <div class="now-copy">
-            <div class="connection" id="connection">
-              <div class="picker" id="server-picker">
-                <button type="button" class="picker-btn" id="server-button" aria-haspopup="listbox" aria-expanded="false" aria-label="Discord server">
-                  <img id="server-icon" class="picker-avatar hidden" alt="" />
-                  <span class="picker-copy">
-                    <small>Server</small>
-                    <strong id="server-label">Choose a server</strong>
-                  </span>
-                  <svg class="icon" aria-hidden="true"><use href="#i-chevron"></use></svg>
-                </button>
-                <ul class="menu picker-menu" id="server-menu" hidden role="listbox" aria-label="Discord servers"></ul>
-              </div>
-              <div class="picker" id="channel-picker">
-                <button type="button" class="picker-btn" id="channel-button" aria-haspopup="listbox" aria-expanded="false" aria-label="Voice channel">
-                  <span class="live-dot" id="voice-dot" data-state="off"></span>
-                  <span class="picker-copy">
-                    <small id="voice-state">Disconnected</small>
-                    <strong id="channel-label">Choose a voice channel</strong>
-                  </span>
-                  <span class="member-count hidden" id="member-count"></span>
-                  <svg class="icon" aria-hidden="true"><use href="#i-chevron"></use></svg>
-                </button>
-                <ul class="menu picker-menu" id="channel-menu" hidden role="listbox" aria-label="Voice channels"></ul>
-              </div>
-            </div>
-
-            <p class="eyebrow" id="now-eyebrow">Nothing spinning</p>
+            <p class="kicker" id="now-eyebrow"></p>
             <h1 id="title">Nothing spinning</h1>
             <p id="artist" class="now-artist">Search the crate and put something on.</p>
             <p id="added-by" class="now-added hidden"></p>
@@ -208,6 +182,32 @@
                 <svg class="icon party-collapse" aria-hidden="true"><use href="#i-collapse"></use></svg>
               </button>
             </div>
+
+            <div class="connection" id="connection">
+              <div class="picker" id="server-picker">
+                <button type="button" class="picker-btn" id="server-button" aria-haspopup="listbox" aria-expanded="false" aria-label="Discord server">
+                  <img id="server-icon" class="picker-avatar hidden" alt="" />
+                  <span class="picker-copy">
+                    <small>Server</small>
+                    <strong id="server-label">Choose a server</strong>
+                  </span>
+                  <svg class="icon" aria-hidden="true"><use href="#i-chevron"></use></svg>
+                </button>
+                <ul class="menu picker-menu" id="server-menu" hidden role="listbox" aria-label="Discord servers"></ul>
+              </div>
+              <div class="picker" id="channel-picker">
+                <button type="button" class="picker-btn" id="channel-button" aria-haspopup="listbox" aria-expanded="false" aria-label="Voice channel">
+                  <span class="live-dot" id="voice-dot" data-state="off"></span>
+                  <span class="picker-copy">
+                    <small id="voice-state">Disconnected</small>
+                    <strong id="channel-label">Choose a voice channel</strong>
+                  </span>
+                  <span class="member-count hidden" id="member-count"></span>
+                  <svg class="icon" aria-hidden="true"><use href="#i-chevron"></use></svg>
+                </button>
+                <ul class="menu picker-menu" id="channel-menu" hidden role="listbox" aria-label="Voice channels"></ul>
+              </div>
+            </div>
           </div>
 
           <aside class="rail">
@@ -230,12 +230,7 @@
       </section>
 
       <section class="library" id="library">
-        <div class="library-head">
-          <div>
-            <p class="eyebrow">Library</p>
-            <p id="search-status" class="library-status" aria-live="polite">Search the crate.</p>
-          </div>
-        </div>
+        <p id="search-status" class="library-status" aria-live="polite"></p>
         <div id="search-skeleton" class="skeleton-stack hidden" aria-hidden="true">
           <div class="skeleton-row"></div>
           <div class="skeleton-cards">

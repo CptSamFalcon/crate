@@ -116,6 +116,18 @@ function setBusy(message) {
   searchStatus.textContent = message;
 }
 
+function setVolumeFill(value) {
+  volumeInput.style.setProperty("--fill", `${(Number(value) / 150) * 100}%`);
+}
+
+function syncLibraryClass() {
+  const open =
+    hasSearched ||
+    !albumView.classList.contains("hidden") ||
+    !artistView.classList.contains("hidden");
+  document.body.classList.toggle("has-library", open);
+}
+
 function closeMenus(except) {
   for (const menu of document.querySelectorAll(".menu")) {
     if (menu === except) continue;
@@ -162,7 +174,10 @@ function renderStatus(next) {
     ? next.paused
       ? "Paused"
       : "Now playing"
-    : "Nothing spinning";
+    : "";
+  document.body.classList.toggle("is-idle", !current);
+  document.body.classList.toggle("is-playing", Boolean(current) && !next.paused);
+  document.body.classList.toggle("is-paused", Boolean(current) && next.paused);
   const addedBy = document.querySelector("#added-by");
   if (current?.requestedBy) {
     addedBy.textContent = `Added by ${current.requestedBy}`;
@@ -194,6 +209,7 @@ function renderStatus(next) {
   volumeInput.value = String(next.volume);
   volumeLabel.textContent = `${next.volume}%`;
   volumeInput.disabled = locked;
+  setVolumeFill(next.volume);
   renderQueue(current, next.queue ?? []);
   renderTransport(next);
   tickElapsed();
@@ -220,7 +236,7 @@ function renderVoiceState(next) {
     dot.dataset.state = "off";
   }
   if (connected && channel?.memberCount) {
-    members.textContent = String(channel.memberCount);
+    members.innerHTML = `<svg class="icon" aria-hidden="true"><use href="#i-people"></use></svg>${channel.memberCount}`;
     members.classList.remove("hidden");
   } else {
     members.textContent = "";
@@ -240,18 +256,27 @@ function renderTransport(next) {
   }
 }
 
+function queueRow(track, { now = false, index = 0 } = {}) {
+  const item = document.createElement("li");
+  if (now) item.className = "is-now";
+  const art = `<span class="queue-thumb">${track.coverUrl ? `<img src="${escapeHtml(track.coverUrl)}" alt="">` : ""}</span>`;
+  const who = track.requestedBy ? ` · ${escapeHtml(track.requestedBy)}` : "";
+  const marker = now ? "Now" : String(index + 1).padStart(2, "0");
+  item.innerHTML = `<span class="queue-index">${marker}</span>${art}<span class="queue-copy"><b>${escapeHtml(track.title)}</b><small>${escapeHtml(track.artist)}${who}</small></span><span class="muted">${formatDuration(track.durationSeconds)}</span>`;
+  bindCover(item.querySelector("img"));
+  return item;
+}
+
 function renderQueue(current, queue) {
   queueEl.innerHTML = "";
-  document.querySelector("#queue-count").textContent = current || queue.length ? String(queue.length) : "";
+  document.querySelector("#queue-count").textContent = queue.length ? String(queue.length) : "";
   if (!current && queue.length === 0) {
     queueEl.innerHTML = `<li class="empty-row">Queue is empty.</li>`;
     return;
   }
+  if (current) queueEl.append(queueRow(current, { now: true }));
   queue.forEach((track, index) => {
-    const item = document.createElement("li");
-    const art = `<span class="queue-thumb">${track.coverUrl ? `<img src="${escapeHtml(track.coverUrl)}" alt="">` : ""}</span>`;
-    const who = track.requestedBy ? ` · ${escapeHtml(track.requestedBy)}` : "";
-    item.innerHTML = `${art}<span class="queue-copy"><b>${escapeHtml(track.title)}</b><small>${escapeHtml(track.artist)}${who}</small></span><span class="muted">${formatDuration(track.durationSeconds)}</span>`;
+    const item = queueRow(track, { index });
     const remove = document.createElement("button");
     remove.type = "button";
     remove.className = "ghost-btn";
@@ -259,7 +284,6 @@ function renderQueue(current, queue) {
     remove.innerHTML = `<svg class="icon" aria-hidden="true"><use href="#i-close"></use></svg>`;
     remove.addEventListener("click", () => void removeQueued(index, remove));
     item.append(remove);
-    bindCover(item.querySelector("img"));
     queueEl.append(item);
   });
 }
@@ -455,6 +479,7 @@ function showBrowse() {
   openAlbum = null;
   albumReturn = "browse";
   libraryEmpty.classList.toggle("hidden", hasSearched);
+  syncLibraryClass();
 }
 
 function showArtist() {
@@ -462,6 +487,7 @@ function showArtist() {
   browseEl.classList.add("hidden");
   artistView.classList.remove("hidden");
   albumReturn = "artist";
+  syncLibraryClass();
 }
 
 function albumBadge(album) {
@@ -501,12 +527,15 @@ function appendSection(title) {
 function setSearching(on) {
   searchSkeleton.classList.toggle("hidden", !on);
   libraryEmpty.classList.add("hidden");
-  if (on) resultsEl.innerHTML = "";
+  if (on) {
+    resultsEl.innerHTML = "";
+    document.body.classList.add("has-library");
+  }
 }
 
 function renderSearch(payload) {
-  showBrowse();
   hasSearched = true;
+  showBrowse();
   libraryEmpty.classList.add("hidden");
   resultsEl.innerHTML = "";
   const artists = payload.artists ?? [];
@@ -642,6 +671,7 @@ async function openAlbumView(albumId, from = "browse") {
     browseEl.classList.add("hidden");
     artistView.classList.add("hidden");
     albumView.classList.remove("hidden");
+    syncLibraryClass();
     document.querySelector("#album-title").textContent = detail.album.title;
     document.querySelector("#album-artist").textContent = detail.album.artist;
     document.querySelector("#album-year").textContent = detail.album.year ? String(detail.album.year) : "Album";
@@ -856,6 +886,7 @@ document.querySelector("#search-form").addEventListener("submit", async (event) 
   event.preventDefault();
   const query = document.querySelector("#query").value.trim();
   if (!query) return;
+  hasSearched = true;
   setSearching(true);
   setBusy("Searching…");
   try {
@@ -866,6 +897,7 @@ document.querySelector("#search-form").addEventListener("submit", async (event) 
   } finally {
     setSearching(false);
     if (hasSearched && resultsEl.children.length) libraryEmpty.classList.add("hidden");
+    syncLibraryClass();
   }
 });
 
@@ -897,6 +929,7 @@ document.querySelector(".transport").addEventListener("click", async (event) => 
 let volumeTimer = 0;
 volumeInput.addEventListener("input", () => {
   volumeLabel.textContent = `${volumeInput.value}%`;
+  setVolumeFill(volumeInput.value);
   clearTimeout(volumeTimer);
   volumeTimer = setTimeout(() => {
     void api("/api/volume", {
