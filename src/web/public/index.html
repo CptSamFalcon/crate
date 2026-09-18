@@ -4,7 +4,8 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Crate</title>
-    <link rel="icon" href="/rou.png" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/brand/crate-app-icon.svg" />
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
@@ -82,12 +83,12 @@
     <div id="login" class="screen hidden">
       <div class="login-card">
         <div class="login-mark" aria-hidden="true">
-          <span class="login-disc"></span>
-          <img src="/rou.png" alt="" />
+          <span class="login-orbit"></span>
+          <img src="/brand/crate-app-icon.svg" alt="" />
         </div>
-        <p class="eyebrow">Private listening room</p>
+        <p class="eyebrow">Discord music, your way</p>
         <h1>Crate</h1>
-        <p class="login-copy">Sign in with Discord. Browse the crate, queue what’s on the media server, or request what isn’t — Rou plays it in voice.</p>
+        <p class="login-copy">Sign in with Discord. Browse the crate, queue what’s on the media server, or request what isn’t — then play it in voice.</p>
         <p id="login-error" class="error hidden"></p>
         <a class="btn primary login-btn" href="/auth/discord">Continue with Discord</a>
       </div>
@@ -96,7 +97,7 @@
     <div id="app" class="app hidden">
       <header class="topbar">
         <a class="wordmark" href="/" aria-label="Crate home">
-          <img src="/rou.png" alt="" />
+          <img src="/brand/crate-mark.svg" alt="" />
           <span>Crate</span>
         </a>
         <form id="search-form" class="search" role="search">
@@ -105,7 +106,7 @@
             id="query"
             type="search"
             name="q"
-            placeholder="Search artists, albums, tracks…"
+            placeholder="Search artists, albums, or tracks…"
             maxlength="200"
             required
             autocomplete="off"
@@ -136,17 +137,16 @@
         <div class="stage-grid">
           <div class="artwork" id="cover-wrap">
             <img id="cover" alt="" />
-            <div class="vinyl" aria-hidden="true">
-              <span></span>
-              <span></span>
-              <span></span>
+            <div class="idle-mark" aria-hidden="true">
+              <span class="idle-orbit"></span>
+              <img src="/brand/crate-mark.svg" alt="" />
             </div>
           </div>
 
           <div class="now-copy">
             <p class="kicker" id="now-eyebrow"></p>
-            <h1 id="title">Nothing spinning</h1>
-            <p id="artist" class="now-artist">Search the crate and put something on.</p>
+            <h1 id="title">Nothing playing</h1>
+            <p id="artist" class="now-artist">Search the crate to find music.</p>
             <p id="added-by" class="now-added hidden"></p>
             <button type="button" class="album-link" id="album"></button>
 
@@ -241,8 +241,8 @@
         </div>
         <div id="browse">
           <div id="library-empty" class="library-empty">
-            <div class="empty-disc" aria-hidden="true"></div>
-            <h2>Dig through the crate</h2>
+            <img class="empty-mark" src="/brand/crate-mark.svg" alt="" />
+            <h2>Search the crate</h2>
             <p>Search for an artist, album, or track.</p>
           </div>
           <div id="results"></div>

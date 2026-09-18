@@ -166,10 +166,10 @@ function renderStatus(next) {
   status = next;
   const current = next.nowPlaying;
   const locked = next.canControl === false;
-  document.querySelector("#title").textContent = current ? current.title : "Nothing spinning";
+  document.querySelector("#title").textContent = current ? current.title : "Nothing playing";
   document.querySelector("#artist").textContent = current
     ? current.artist
-    : "Search the crate and put something on.";
+    : "Search the crate to find music.";
   document.querySelector("#now-eyebrow").textContent = current
     ? next.paused
       ? "Paused"
@@ -559,8 +559,8 @@ function renderSearch(payload) {
     libraryEmpty.querySelector("p").textContent = payload.message || "Try another artist, album, or track.";
     return;
   }
-  libraryEmpty.querySelector("h2").textContent = "Dig through the crate";
-  libraryEmpty.querySelector("p").textContent = "Search for an artist, album, or track.";
+    libraryEmpty.querySelector("h2").textContent = "Search the crate";
+    libraryEmpty.querySelector("p").textContent = "Search for an artist, album, or track.";
   const parts = [];
   if (artists.length) parts.push(`${artists.length} artist${artists.length === 1 ? "" : "s"}`);
   if (albums.length) {

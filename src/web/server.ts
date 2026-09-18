@@ -172,6 +172,19 @@ export function startWeb(deps: WebDeps): void {
   app.get("/app.js", () => publicFile("app.js", "text/javascript; charset=utf-8"));
   app.get("/styles.css", () => publicFile("styles.css", "text/css; charset=utf-8"));
   app.get("/rou.png", () => publicFile("rou.png", "image/png"));
+  const brandFiles: Record<string, string> = {
+    "crate-mark.svg": "image/svg+xml; charset=utf-8",
+    "crate-logo.svg": "image/svg+xml; charset=utf-8",
+    "crate-app-icon.svg": "image/svg+xml; charset=utf-8",
+    "tokens.css": "text/css; charset=utf-8",
+  };
+  app.get("/favicon.svg", () => publicFile("brand/crate-app-icon.svg", "image/svg+xml; charset=utf-8"));
+  app.get("/brand/:name", (c) => {
+    const name = c.req.param("name");
+    const type = brandFiles[name];
+    if (!type) return c.notFound();
+    return publicFile(`brand/${name}`, type);
+  });
 
   app.get("/auth/discord", rateLimit("oauth", 10, 10 * 60_000), (c) => c.redirect(beginOAuth(c, web, clientId)));
   const logout = (c: Parameters<typeof clearSession>[0]) => {

@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none" role="img" aria-label="Crate">
+  <defs>
+    <linearGradient id="icon-bg" x1="80" y1="40" x2="460" y2="500" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#7C86F9"/>
+      <stop offset="1" stop-color="#4F5BE8"/>
+    </linearGradient>
+    <linearGradient id="icon-crate" x1="256" y1="200" x2="256" y2="430" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#E8EBF2"/>
+    </linearGradient>
+    <linearGradient id="icon-vinyl" x1="150" y1="90" x2="310" y2="250" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#C7D2FE"/>
+      <stop offset="0.22" stop-color="#3E4678"/>
+      <stop offset="1" stop-color="#161822"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="118" fill="url(#icon-bg)"/>
+  <g opacity="0.7">
+    <circle cx="198" cy="148" r="58" fill="url(#icon-vinyl)"/>
+    <circle cx="198" cy="148" r="12" fill="#0F1115"/>
+  </g>
+  <g opacity="0.9">
+    <circle cx="214" cy="170" r="66" fill="url(#icon-vinyl)"/>
+    <circle cx="214" cy="170" r="13" fill="#0F1115"/>
+  </g>
+  <circle cx="230" cy="196" r="74" fill="url(#icon-vinyl)"/>
+  <circle cx="230" cy="196" r="52" fill="none" stroke="#C7D2FE" stroke-opacity="0.22" stroke-width="5"/>
+  <circle cx="230" cy="196" r="14" fill="#0F1115"/>
+  <rect x="96" y="214" width="320" height="204" rx="48" fill="url(#icon-crate)"/>
+  <rect x="96" y="274" width="204" height="32" fill="#4A56E4"/>
+  <rect x="96" y="334" width="204" height="32" fill="#4A56E4"/>
+  <rect x="312" y="238" width="40" height="156" rx="20" fill="#FFFFFF"/>
+  <rect x="368" y="278" width="40" height="116" rx="20" fill="#FFFFFF"/>
+</svg>
