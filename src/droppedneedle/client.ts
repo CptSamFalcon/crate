@@ -1,7 +1,9 @@
 import type {
   AlbumRequestResponse,
+  ArtistReleases,
   CatalogAlbumBasic,
   CatalogAlbumTracks,
+  CatalogArtistInfo,
   CatalogSearchResponse,
   CrateTrack,
   DroppedNeedleUser,
@@ -11,6 +13,8 @@ import type {
   LocalTrackInfo,
   NativeLibraryAlbum,
   NativeLibraryAlbumsResponse,
+  NativeLibraryArtist,
+  NativeLibraryArtistsResponse,
   NativeLibraryTrack,
   NativeLibraryTracksResponse,
   NeedleActiveRequestsResponse,
@@ -131,6 +135,15 @@ export class DroppedNeedleClient {
     return this.requestJson<CatalogSearchResponse>(`/api/v1/search?${params}`);
   }
 
+  async getCatalogArtist(mbid: string): Promise<CatalogArtistInfo> {
+    return this.requestJson<CatalogArtistInfo>(`/api/v1/artists/${encodeURIComponent(mbid)}`);
+  }
+
+  async getArtistReleases(mbid: string): Promise<ArtistReleases> {
+    const params = new URLSearchParams({ limit: "50", offset: "0" });
+    return this.requestJson<ArtistReleases>(`/api/v1/artists/${encodeURIComponent(mbid)}/releases?${params}`);
+  }
+
   async getCatalogAlbumBasic(mbid: string): Promise<CatalogAlbumBasic> {
     return this.requestJson<CatalogAlbumBasic>(`/api/v1/albums/${encodeURIComponent(mbid)}/basic`);
   }
@@ -216,6 +229,25 @@ export class DroppedNeedleClient {
   async searchNativeAlbums(query: string): Promise<NativeLibraryAlbum[]> {
     const params = new URLSearchParams({ q: query, page: "1", page_size: "8", sort: "recent" });
     const payload = await this.requestJson<NativeLibraryAlbumsResponse>(`/api/v1/library/albums?${params}`);
+    return payload.items ?? [];
+  }
+
+  async searchNativeArtists(query: string): Promise<NativeLibraryArtist[]> {
+    const params = new URLSearchParams({
+      q: query,
+      limit: "8",
+      offset: "0",
+      sort_by: "name",
+      sort_order: "asc",
+    });
+    const payload = await this.requestJson<NativeLibraryArtistsResponse>(`/api/v1/library/artists?${params}`);
+    return payload.items ?? [];
+  }
+
+  async getNativeArtistAlbums(artistId: string): Promise<NativeLibraryAlbum[]> {
+    const payload = await this.requestJson<NativeLibraryAlbumsResponse>(
+      `/api/v1/library/artists/${encodeURIComponent(artistId)}/albums`,
+    );
     return payload.items ?? [];
   }
 

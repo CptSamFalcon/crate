@@ -11,14 +11,15 @@ import {
   coverArtArchiveUrl,
   coverUrlFor,
   findAlbum,
-  findAlbums,
   findTracks,
   getAlbum,
   getAlbumTracksById,
+  getArtist,
   listIncomingRequests,
   missingLibrary,
   playableFromId,
   requestFromNeedle,
+  searchMedia,
   serializeTrack,
   toQueueItem,
   tracksForIncoming,
@@ -153,11 +154,18 @@ export function startWeb(deps: WebDeps): void {
   api.get("/search", async (c) => {
     const query = c.req.query("q")?.trim() ?? "";
     if (!query) return c.json({ error: "Missing query" }, 400);
-    const albums = await findAlbums(needle, query);
-    if (albums.length === 0) {
-      return c.json({ albums: [], message: `Nothing matched “${query}”.`, catalog: [] });
+    const results = await searchMedia(needle, query);
+    if (results.artists.length === 0 && results.albums.length === 0 && results.tracks.length === 0) {
+      return c.json({ ...results, message: `Nothing matched “${query}”.` });
     }
-    return c.json({ albums, message: null, catalog: [] });
+    return c.json({ ...results, message: null });
+  });
+
+  api.get("/artists/:id", async (c) => {
+    const id = decodeURIComponent(c.req.param("id"));
+    const detail = await getArtist(needle, id);
+    if (!detail) return c.json({ error: "Artist not found" }, 404);
+    return c.json(detail);
   });
 
   api.get("/albums/:id", async (c) => {
@@ -273,10 +281,13 @@ export function startWeb(deps: WebDeps): void {
   api.get("/cover", async (c) => {
     const id = c.req.query("id");
     const albumId = c.req.query("album");
-    if (!id && !albumId) return new Response(null, { status: 400 });
-    const url = albumId
-      ? coverUrlFor(albumId)
-      : coverUrlFor(id!) ?? coverArtArchiveUrl(playableFromId(id!)?.albumMbid);
+    const artistId = c.req.query("artist");
+    if (!id && !albumId && !artistId) return new Response(null, { status: 400 });
+    const url = artistId
+      ? (coverUrlFor(`artist:${artistId}`) ?? needle.resolveUrl(`/api/v1/covers/artist/${artistId}`))
+      : albumId
+        ? coverUrlFor(albumId)
+        : coverUrlFor(id!) ?? coverArtArchiveUrl(playableFromId(id!)?.albumMbid);
     if (!url) return new Response(null, { status: 404 });
     try {
       const response = await needle.fetchCover(url);

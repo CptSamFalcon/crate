@@ -74,6 +74,21 @@ export type PublicAlbum = {
   requested: boolean;
 };
 
+export type PublicArtist = {
+  id: string;
+  name: string;
+  coverUrl: string | null;
+  inLibrary: boolean;
+  albumCount: number | null;
+  disambiguation: string | null;
+};
+
+export type SearchResults = {
+  artists: PublicArtist[];
+  albums: PublicAlbum[];
+  tracks: PublicTrack[];
+};
+
 type StoredAlbum = {
   id: string;
   title: string;
@@ -89,6 +104,19 @@ type StoredAlbum = {
 };
 
 const albumById = new Map<string, StoredAlbum>();
+
+type StoredArtist = {
+  id: string;
+  name: string;
+  mbid: string | null;
+  nativeId: string | null;
+  coverUrl: string | null;
+  inLibrary: boolean;
+  albumCount: number | null;
+  disambiguation: string | null;
+};
+
+const artistById = new Map<string, StoredArtist>();
 
 function albumCoverSrc(album: StoredAlbum): string | null {
   if (album.coverUrl && isPublicCoverUrl(album.coverUrl)) return album.coverUrl;
@@ -117,9 +145,30 @@ export function coverUrlFor(fileId: string): string | undefined {
   if (stored) return stored;
   const albumStored = coverById.get(`album:${fileId}`);
   if (albumStored) return albumStored;
+  const artistStored = coverById.get(`artist:${fileId}`);
+  if (artistStored) return artistStored;
   const track = playableById.get(fileId);
   if (track?.albumMbid) return coverArtArchiveUrl(track.albumMbid) ?? undefined;
   return undefined;
+}
+
+function artistCoverSrc(artist: StoredArtist): string | null {
+  if (artist.coverUrl && isPublicCoverUrl(artist.coverUrl)) return artist.coverUrl;
+  if (artist.coverUrl) return `/api/cover?artist=${encodeURIComponent(artist.id)}`;
+  return null;
+}
+
+export function serializeArtist(artist: StoredArtist): PublicArtist {
+  artistById.set(artist.id, artist);
+  if (artist.coverUrl) coverById.set(`artist:${artist.id}`, artist.coverUrl);
+  return {
+    id: artist.id,
+    name: artist.name,
+    coverUrl: artistCoverSrc(artist),
+    inLibrary: artist.inLibrary,
+    albumCount: artist.albumCount,
+    disambiguation: artist.disambiguation,
+  };
 }
 
 function upsertAlbum(album: StoredAlbum): void {
@@ -138,13 +187,85 @@ function upsertAlbum(album: StoredAlbum): void {
   if (album.requested) existing.requested = true;
 }
 
-export async function findAlbums(needle: DroppedNeedleClient, query: string): Promise<PublicAlbum[]> {
-  const [local, nativeAlbums, nativeTracks, catalog] = await Promise.all([
+function upsertArtist(artist: StoredArtist, portrait = false): void {
+  const existing = artistById.get(artist.id);
+  if (!existing) {
+    artistById.set(artist.id, artist);
+    return;
+  }
+  if (artist.inLibrary) existing.inLibrary = true;
+  if (artist.nativeId && !existing.nativeId) existing.nativeId = artist.nativeId;
+  if (artist.mbid && !existing.mbid) existing.mbid = artist.mbid;
+  if (artist.coverUrl && (!existing.coverUrl || portrait)) existing.coverUrl = artist.coverUrl;
+  if (artist.albumCount != null && existing.albumCount == null) existing.albumCount = artist.albumCount;
+  if (artist.disambiguation && !existing.disambiguation) existing.disambiguation = artist.disambiguation;
+  if (artist.name && artist.name !== existing.name) existing.name = artist.name;
+}
+
+function catalogArtistImage(needle: DroppedNeedleClient, item: { musicbrainz_id: string; thumb_url?: string | null; cover_url?: string | null; fanart_url?: string | null; image?: string | null }): string | null {
+  const direct = needle.resolveUrl(item.thumb_url ?? item.image ?? item.cover_url ?? item.fanart_url);
+  if (direct && (isPublicCoverUrl(direct) || needle.isLocalUrl(direct))) return direct;
+  if (item.musicbrainz_id) return needle.resolveUrl(`/api/v1/covers/artist/${item.musicbrainz_id}`);
+  return direct;
+}
+
+function nativeAlbumFromSearch(
+  needle: DroppedNeedleClient,
+  album: { id: string; title: string; artist_name: string; musicbrainz_release_group_id?: string | null; cover_available?: boolean; track_count?: number },
+): StoredAlbum {
+  const id = album.musicbrainz_release_group_id ?? `native:${album.id}`;
+  return {
+    id,
+    title: album.title,
+    artist: album.artist_name,
+    year: null,
+    trackCount: album.track_count ?? null,
+    coverUrl: album.cover_available ? needle.nativeArtworkUrl(album.id) : null,
+    mbid: album.musicbrainz_release_group_id ?? null,
+    nativeId: album.id,
+    matchedTrack: null,
+    inLibrary: true,
+    requested: false,
+  };
+}
+
+function songKey(track: { title: string; artist: string; album: string }): string {
+  return `${track.title.toLowerCase()}|${track.artist.toLowerCase()}|${track.album.toLowerCase()}`;
+}
+
+function collectAlbums(order: StoredAlbum[]): PublicAlbum[] {
+  const seen = new Set<string>();
+  const playable: PublicAlbum[] = [];
+  const requestable: PublicAlbum[] = [];
+  for (const album of order) {
+    if (seen.has(album.id)) continue;
+    seen.add(album.id);
+    const serialized = serializeAlbum(album);
+    if (serialized.inLibrary) playable.push(serialized);
+    else requestable.push(serialized);
+  }
+  return [...playable, ...requestable];
+}
+
+export async function searchMedia(needle: DroppedNeedleClient, query: string): Promise<SearchResults> {
+  const [local, nativeAlbums, nativeTracks, nativeArtists, catalog] = await Promise.all([
     needle.searchLibrary(query),
     needle.searchNativeAlbums(query).catch(() => [] as Awaited<ReturnType<DroppedNeedleClient["searchNativeAlbums"]>>),
     needle.searchNativeTracks(query, 25).catch(() => [] as Awaited<ReturnType<DroppedNeedleClient["searchNativeTracks"]>>),
-    needle.searchCatalog(query).catch(() => ({ albums: [] as NonNullable<Awaited<ReturnType<DroppedNeedleClient["searchCatalog"]>>["albums"]> })),
+    needle.searchNativeArtists(query).catch(() => [] as Awaited<ReturnType<DroppedNeedleClient["searchNativeArtists"]>>),
+    needle.searchCatalog(query).catch(() => ({
+      albums: [] as NonNullable<Awaited<ReturnType<DroppedNeedleClient["searchCatalog"]>>["albums"]>,
+      artists: [] as NonNullable<Awaited<ReturnType<DroppedNeedleClient["searchCatalog"]>>["artists"]>,
+      top_artist: null,
+      top_album: null,
+    })),
   ]);
+
+  const foundArtists = new Set<string>();
+  const rememberArtist = (artist: StoredArtist, portrait = false) => {
+    upsertArtist(artist, portrait);
+    foundArtists.add(artist.id);
+  };
 
   for (const album of local.albums ?? []) {
     upsertAlbum({
@@ -160,54 +281,21 @@ export async function findAlbums(needle: DroppedNeedleClient, query: string): Pr
       inLibrary: true,
       requested: false,
     });
-  }
-  for (const track of local.tracks ?? []) {
-    const id = track.album_mbid ?? `name:${track.artist_name.toLowerCase()}|${track.album_name.toLowerCase()}`;
-    upsertAlbum({
-      id,
-      title: track.album_name,
-      artist: track.artist_name,
-      year: track.year ?? null,
-      trackCount: null,
-      coverUrl: needle.resolveUrl(track.cover_url),
-      mbid: track.album_mbid ?? null,
-      nativeId: null,
-      matchedTrack: track.title,
-      inLibrary: true,
-      requested: false,
-    });
+    if (album.artist_mbid) {
+      rememberArtist({
+        id: album.artist_mbid,
+        name: album.artist_name,
+        mbid: album.artist_mbid,
+        nativeId: null,
+        coverUrl: needle.resolveUrl(album.cover_url),
+        inLibrary: true,
+        albumCount: null,
+        disambiguation: null,
+      });
+    }
   }
   for (const album of nativeAlbums) {
-    const id = album.musicbrainz_release_group_id ?? `native:${album.id}`;
-    upsertAlbum({
-      id,
-      title: album.title,
-      artist: album.artist_name,
-      year: null,
-      trackCount: album.track_count ?? null,
-      coverUrl: album.cover_available ? needle.nativeArtworkUrl(album.id) : null,
-      mbid: album.musicbrainz_release_group_id ?? null,
-      nativeId: album.id,
-      matchedTrack: null,
-      inLibrary: true,
-      requested: false,
-    });
-  }
-  for (const track of nativeTracks) {
-    const id = track.musicbrainz_release_group_id ?? `native:${track.album_id}`;
-    upsertAlbum({
-      id,
-      title: track.album_title,
-      artist: track.artist_name,
-      year: null,
-      trackCount: null,
-      coverUrl: track.cover_available ? needle.nativeArtworkUrl(track.album_id) : null,
-      mbid: track.musicbrainz_release_group_id ?? null,
-      nativeId: track.album_id,
-      matchedTrack: track.title,
-      inLibrary: true,
-      requested: false,
-    });
+    upsertAlbum(nativeAlbumFromSearch(needle, album));
   }
   for (const album of catalog.albums ?? []) {
     if (!album.musicbrainz_id) continue;
@@ -222,45 +310,113 @@ export async function findAlbums(needle: DroppedNeedleClient, query: string): Pr
       mbid: album.musicbrainz_id,
       nativeId: null,
       matchedTrack: null,
-      inLibrary: false,
+      inLibrary: Boolean(album.in_library),
       requested: Boolean(album.requested),
     });
   }
 
-  const seen = new Set<string>();
-  const order: StoredAlbum[] = [];
+  const catalogArtists = [
+    catalog.top_artist,
+    ...(catalog.artists ?? []),
+  ].filter((item): item is NonNullable<typeof item> => Boolean(item?.musicbrainz_id));
+  for (const artist of catalogArtists) {
+    rememberArtist(
+      {
+        id: artist.musicbrainz_id,
+        name: artist.title,
+        mbid: artist.musicbrainz_id,
+        nativeId: null,
+        coverUrl: catalogArtistImage(needle, artist),
+        inLibrary: Boolean(artist.in_library),
+        albumCount: null,
+        disambiguation: artist.disambiguation ?? null,
+      },
+      true,
+    );
+  }
+  for (const artist of nativeArtists) {
+    const id = artist.musicbrainz_artist_id ?? `native-artist:${artist.id}`;
+    rememberArtist({
+      id,
+      name: artist.name,
+      mbid: artist.musicbrainz_artist_id ?? null,
+      nativeId: artist.id,
+      coverUrl: artist.musicbrainz_artist_id
+        ? needle.resolveUrl(`/api/v1/covers/artist/${artist.musicbrainz_artist_id}`)
+        : null,
+      inLibrary: true,
+      albumCount: artist.album_count ?? null,
+      disambiguation: null,
+    });
+  }
+
+  const artistSeen = new Set<string>();
+  const artistOrder: StoredArtist[] = [];
+  const takeArtist = (id: string | null | undefined) => {
+    if (!id || !foundArtists.has(id)) return;
+    const stored = artistById.get(id);
+    if (!stored || artistSeen.has(stored.id)) return;
+    artistSeen.add(stored.id);
+    artistOrder.push(stored);
+  };
+  takeArtist(catalog.top_artist?.musicbrainz_id);
+  const needleQuery = query.trim().toLowerCase();
+  for (const id of foundArtists) {
+    const artist = artistById.get(id);
+    if (artist?.name.toLowerCase() === needleQuery) takeArtist(id);
+  }
+  for (const artist of nativeArtists) {
+    takeArtist(artist.musicbrainz_artist_id ?? `native-artist:${artist.id}`);
+  }
+  for (const artist of catalog.artists ?? []) takeArtist(artist.musicbrainz_id);
+  for (const id of foundArtists) takeArtist(id);
+
+  const albumOrder: StoredAlbum[] = [];
+  if (catalog.top_album?.musicbrainz_id) {
+    const top = albumById.get(catalog.top_album.musicbrainz_id);
+    if (top) albumOrder.push(top);
+  }
   for (const album of local.albums ?? []) {
     const stored = albumById.get(album.musicbrainz_id);
-    if (stored) order.push(stored);
-  }
-  for (const track of local.tracks ?? []) {
-    const id = track.album_mbid ?? `name:${track.artist_name.toLowerCase()}|${track.album_name.toLowerCase()}`;
-    const stored = albumById.get(id);
-    if (stored) order.push(stored);
+    if (stored) albumOrder.push(stored);
   }
   for (const album of nativeAlbums) {
     const stored = albumById.get(album.musicbrainz_release_group_id ?? `native:${album.id}`);
-    if (stored) order.push(stored);
-  }
-  for (const track of nativeTracks) {
-    const stored = albumById.get(track.musicbrainz_release_group_id ?? `native:${track.album_id}`);
-    if (stored) order.push(stored);
+    if (stored) albumOrder.push(stored);
   }
   for (const album of catalog.albums ?? []) {
     const stored = albumById.get(album.musicbrainz_id);
-    if (stored) order.push(stored);
+    if (stored) albumOrder.push(stored);
   }
 
-  const playable: PublicAlbum[] = [];
-  const requestable: PublicAlbum[] = [];
-  for (const album of order) {
-    if (seen.has(album.id)) continue;
-    seen.add(album.id);
-    const serialized = serializeAlbum(album);
-    if (serialized.inLibrary) playable.push(serialized);
-    else requestable.push(serialized);
+  const tracks: PublicTrack[] = [];
+  const seenSongs = new Set<string>();
+  const seenFiles = new Set<string>();
+  const pushTrack = (track: PublicTrack) => {
+    const key = songKey(track);
+    if (track.fileId && seenFiles.has(track.fileId)) return;
+    if (seenSongs.has(key)) return;
+    seenSongs.add(key);
+    if (track.fileId) seenFiles.add(track.fileId);
+    tracks.push(track);
+  };
+  for (const track of local.tracks ?? []) {
+    pushTrack(serializeTrack(needle.toPlayable(track)));
   }
-  return [...playable, ...requestable].slice(0, 32);
+  for (const track of nativeTracks) {
+    const playable = needle.nativeToPlayable(track);
+    if (playable) pushTrack(serializeTrack(playable));
+  }
+
+  return {
+    artists: artistOrder.slice(0, 8).map(serializeArtist),
+    albums: collectAlbums(albumOrder).slice(0, 24),
+    tracks: tracks.slice(0, 20),
+  };
+}
+
+export async function findAlbums(needle: DroppedNeedleClient, query: string): Promise<PublicAlbum[]> {
+  return (await searchMedia(needle, query)).albums;
 }
 
 function emptyStored(id: string, mbid: string | null, nativeId: string | null): StoredAlbum {
@@ -412,6 +568,88 @@ export async function getAlbum(
   }
 
   return null;
+}
+
+export async function getArtist(
+  needle: DroppedNeedleClient,
+  id: string,
+): Promise<{ artist: PublicArtist; albums: PublicAlbum[] } | null> {
+  let stored = artistById.get(id);
+  const nativeId = stored?.nativeId ?? (id.startsWith("native-artist:") ? id.slice(14) : null);
+  const mbid = stored?.mbid ?? (/^[0-9a-f-]{36}$/i.test(id) ? id : null);
+  if (!stored) {
+    if (!mbid && !nativeId) return null;
+    stored = {
+      id,
+      name: "",
+      mbid,
+      nativeId,
+      coverUrl: mbid ? needle.resolveUrl(`/api/v1/covers/artist/${mbid}`) : null,
+      inLibrary: Boolean(nativeId),
+      albumCount: null,
+      disambiguation: null,
+    };
+    artistById.set(id, stored);
+  }
+
+  const [nativeAlbums, catalog, releases] = await Promise.all([
+    nativeId ? needle.getNativeArtistAlbums(nativeId).catch(() => []) : Promise.resolve([]),
+    mbid ? needle.getCatalogArtist(mbid).catch(() => null) : Promise.resolve(null),
+    mbid ? needle.getArtistReleases(mbid).catch(() => null) : Promise.resolve(null),
+  ]);
+
+  if (catalog) {
+    stored.name = catalog.name || stored.name;
+    stored.mbid = catalog.musicbrainz_id || stored.mbid;
+    stored.disambiguation = catalog.disambiguation ?? stored.disambiguation;
+    const portrait = catalogArtistImage(needle, catalog);
+    if (portrait) stored.coverUrl = portrait;
+    upsertArtist(stored, true);
+  }
+  stored.name = stored.name || "Artist";
+
+  for (const album of nativeAlbums) {
+    const item = nativeAlbumFromSearch(needle, album);
+    if (!item.artist) item.artist = stored.name;
+    upsertAlbum(item);
+  }
+
+  const releaseItems = [
+    ...(releases?.albums ?? []),
+    ...(releases?.eps ?? []),
+    ...(releases?.singles ?? []),
+  ];
+  for (const release of releaseItems) {
+    if (!release.id || !release.title) continue;
+    upsertAlbum({
+      id: release.id,
+      title: release.title,
+      artist: stored.name,
+      year: release.year ?? null,
+      trackCount: null,
+      coverUrl: coverArtArchiveUrl(release.id),
+      mbid: release.id,
+      nativeId: null,
+      matchedTrack: null,
+      inLibrary: Boolean(release.in_library),
+      requested: Boolean(release.requested),
+    });
+  }
+
+  const albumOrder: StoredAlbum[] = [];
+  for (const album of nativeAlbums) {
+    const item = albumById.get(album.musicbrainz_release_group_id ?? `native:${album.id}`);
+    if (item) albumOrder.push(item);
+  }
+  for (const release of releaseItems) {
+    if (!release.id) continue;
+    const item = albumById.get(release.id);
+    if (item) albumOrder.push(item);
+  }
+
+  stored.albumCount = collectAlbums(albumOrder).length || stored.albumCount;
+  artistById.set(stored.id, stored);
+  return { artist: serializeArtist(stored), albums: collectAlbums(albumOrder).slice(0, 48) };
 }
 
 function queryGuess(stored: StoredAlbum, id: string): string {

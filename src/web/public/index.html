@@ -67,11 +67,23 @@
       <div class="workspace">
         <section class="panel crate">
           <div id="browse">
-            <p id="search-status" class="muted">Search anything. Albums on the crate play; the rest you can request.</p>
-            <div id="results" class="album-grid"></div>
+            <p id="search-status" class="muted">Search anything. Artists first, then albums, then tracks.</p>
+            <div id="results"></div>
+          </div>
+          <div id="artist-view" class="hidden">
+            <button type="button" class="btn" id="artist-back-btn">Back to search</button>
+            <div class="album-hero">
+              <img id="artist-cover" alt="" />
+              <div>
+                <p class="eyebrow">Artist</p>
+                <h2 id="artist-name"></h2>
+                <p id="artist-meta" class="muted"></p>
+              </div>
+            </div>
+            <div id="artist-albums" class="album-grid"></div>
           </div>
           <div id="album-view" class="hidden">
-            <button type="button" class="btn" id="back-btn">Back to albums</button>
+            <button type="button" class="btn" id="back-btn">Back</button>
             <div class="album-hero">
               <img id="album-cover" alt="" />
               <div>

@@ -11,7 +11,9 @@ const coverEl = document.querySelector("#cover");
 const coverWrap = document.querySelector("#cover-wrap");
 const browseEl = document.querySelector("#browse");
 const albumView = document.querySelector("#album-view");
+const artistView = document.querySelector("#artist-view");
 const albumTracksEl = document.querySelector("#album-tracks");
+const artistAlbumsEl = document.querySelector("#artist-albums");
 
 coverEl.addEventListener("error", () => {
   const current = status?.nowPlaying;
@@ -35,6 +37,8 @@ const LOGIN_ERRORS = {
 let status = null;
 let elapsedTimer = null;
 let openAlbum = null;
+let openArtist = null;
+let albumReturn = "browse";
 let requestPoll = 0;
 
 function formatDuration(seconds) {
@@ -185,8 +189,17 @@ function tickElapsed() {
 
 function showBrowse() {
   albumView.classList.add("hidden");
+  artistView.classList.add("hidden");
   browseEl.classList.remove("hidden");
   openAlbum = null;
+  albumReturn = "browse";
+}
+
+function showArtist() {
+  albumView.classList.add("hidden");
+  browseEl.classList.add("hidden");
+  artistView.classList.remove("hidden");
+  albumReturn = "artist";
 }
 
 function albumBadge(album) {
@@ -194,33 +207,118 @@ function albumBadge(album) {
   return `<span class="badge">${album.requested ? "Requested" : "Request"}</span>`;
 }
 
-function renderAlbums(payload) {
+function bindCover(img) {
+  img?.addEventListener("error", () => {
+    img.remove();
+  });
+}
+
+function appendAlbumCard(container, album, from) {
+  const card = document.createElement("button");
+  card.type = "button";
+  card.className = album.inLibrary ? "album-card" : "album-card requestable";
+  if (album.matchedTrack) card.title = `Matched “${album.matchedTrack}”`;
+  const art = album.coverUrl ? `<img src="${escapeHtml(album.coverUrl)}" alt="">` : "";
+  card.innerHTML = `<div class="art-wrap">${art}${albumBadge(album)}</div><b>${escapeHtml(album.title)}</b><span>${escapeHtml(album.artist)}</span>`;
+  bindCover(card.querySelector("img"));
+  card.addEventListener("click", () => void openAlbumView(album.id, from));
+  container.append(card);
+}
+
+function appendSection(title) {
+  const section = document.createElement("section");
+  section.className = "search-section";
+  const heading = document.createElement("h2");
+  heading.textContent = title;
+  section.append(heading);
+  resultsEl.append(section);
+  return section;
+}
+
+function renderSearch(payload) {
   showBrowse();
   resultsEl.innerHTML = "";
-  if (payload.albums?.length) {
-    const onCrate = payload.albums.filter((album) => album.inLibrary).length;
-    const toRequest = payload.albums.length - onCrate;
-    const parts = [];
-    if (onCrate) parts.push(`${onCrate} on the crate`);
-    if (toRequest) parts.push(`${toRequest} to request`);
-    searchStatus.textContent = parts.join(" · ");
-    for (const album of payload.albums) {
-      const card = document.createElement("button");
-      card.type = "button";
-      card.className = album.inLibrary ? "album-card" : "album-card requestable";
-      if (album.matchedTrack) card.title = `Matched “${album.matchedTrack}”`;
-      const art = album.coverUrl ? `<img src="${escapeHtml(album.coverUrl)}" alt="">` : "";
-      card.innerHTML = `<div class="art-wrap">${art}${albumBadge(album)}</div><b>${escapeHtml(album.title)}</b><span>${escapeHtml(album.artist)}</span>`;
-      const artImg = card.querySelector("img");
-      artImg?.addEventListener("error", () => {
-        artImg.remove();
-      });
-      card.addEventListener("click", () => void openAlbumView(album.id));
-      resultsEl.append(card);
-    }
+  const artists = payload.artists ?? [];
+  const albums = payload.albums ?? [];
+  const tracks = payload.tracks ?? [];
+  if (!artists.length && !albums.length && !tracks.length) {
+    searchStatus.textContent = payload.message || "Nothing matched.";
     return;
   }
-  searchStatus.textContent = payload.message || "Nothing matched.";
+  const parts = [];
+  if (artists.length) parts.push(`${artists.length} artist${artists.length === 1 ? "" : "s"}`);
+  if (albums.length) {
+    const onCrate = albums.filter((album) => album.inLibrary).length;
+    const toRequest = albums.length - onCrate;
+    if (onCrate) parts.push(`${onCrate} album${onCrate === 1 ? "" : "s"} on the crate`);
+    if (toRequest) parts.push(`${toRequest} to request`);
+  }
+  if (tracks.length) parts.push(`${tracks.length} track${tracks.length === 1 ? "" : "s"}`);
+  searchStatus.textContent = parts.join(" · ");
+
+  if (artists.length) {
+    const section = appendSection("Artists");
+    const row = document.createElement("div");
+    row.className = "artist-row";
+    for (const artist of artists) {
+      const card = document.createElement("button");
+      card.type = "button";
+      card.className = "artist-card";
+      const art = artist.coverUrl ? `<img src="${escapeHtml(artist.coverUrl)}" alt="">` : "";
+      card.innerHTML = `<div class="art-wrap">${art}</div><b>${escapeHtml(artist.name)}</b>`;
+      bindCover(card.querySelector("img"));
+      card.addEventListener("click", () => void openArtistView(artist.id));
+      row.append(card);
+    }
+    section.append(row);
+  }
+
+  if (albums.length) {
+    const section = appendSection("Albums");
+    const grid = document.createElement("div");
+    grid.className = "album-grid";
+    for (const album of albums) appendAlbumCard(grid, album, "browse");
+    section.append(grid);
+  }
+
+  if (tracks.length) {
+    const section = appendSection("Tracks");
+    const list = document.createElement("ol");
+    list.className = "tracklist search-tracks";
+    for (const track of tracks) {
+      const item = document.createElement("li");
+      const albumLabel = track.albumMbid
+        ? `<button type="button" class="album-link" data-album-id="${escapeHtml(track.albumMbid)}">${escapeHtml(track.album)}</button>`
+        : escapeHtml(track.album);
+      item.innerHTML = `<span>${escapeHtml(track.title)}<small class="muted">${escapeHtml(track.artist)}${track.album ? ` · ${albumLabel}` : ""}</small></span><span class="muted">${formatDuration(track.durationSeconds)}</span>`;
+      const action = document.createElement("button");
+      action.className = "btn";
+      if (track.fileId) {
+        action.textContent = "Add";
+        action.addEventListener("click", () => void play({ fileId: track.fileId }));
+      } else if (track.recordingMbid) {
+        action.textContent = "Request";
+        action.addEventListener("click", () =>
+          void requestMedia({
+            albumId: track.albumMbid,
+            recordingMbid: track.recordingMbid,
+            title: track.title,
+            durationSeconds: track.durationSeconds,
+          }, action),
+        );
+      } else {
+        action.textContent = "Add";
+        action.disabled = true;
+      }
+      item.append(action);
+      item.querySelector("[data-album-id]")?.addEventListener("click", (event) => {
+        event.preventDefault();
+        void openAlbumView(event.currentTarget.dataset.albumId, "browse");
+      });
+      list.append(item);
+    }
+    section.append(list);
+  }
 }
 
 function paintAlbumAction() {
@@ -252,12 +350,14 @@ function paintAlbumAction() {
   note.textContent = "Not on the media server yet. Request it through Rou.";
 }
 
-async function openAlbumView(albumId) {
+async function openAlbumView(albumId, from = "browse") {
+  albumReturn = from;
   searchStatus.textContent = "Opening album…";
   try {
     const detail = await api(`/api/albums/${encodeURIComponent(albumId)}`);
     openAlbum = detail;
     browseEl.classList.add("hidden");
+    artistView.classList.add("hidden");
     albumView.classList.remove("hidden");
     document.querySelector("#album-title").textContent = detail.album.title;
     document.querySelector("#album-artist").textContent = detail.album.artist;
@@ -321,6 +421,31 @@ async function openAlbumView(albumId) {
   }
 }
 
+async function openArtistView(artistId) {
+  searchStatus.textContent = "Opening artist…";
+  try {
+    const detail = await api(`/api/artists/${encodeURIComponent(artistId)}`);
+    openArtist = detail;
+    showArtist();
+    document.querySelector("#artist-name").textContent = detail.artist.name;
+    const meta = [detail.artist.disambiguation, detail.artist.inLibrary ? "On the crate" : null]
+      .filter(Boolean)
+      .join(" · ");
+    document.querySelector("#artist-meta").textContent = meta;
+    const cover = document.querySelector("#artist-cover");
+    cover.onerror = () => {
+      cover.removeAttribute("src");
+    };
+    if (detail.artist.coverUrl) cover.src = detail.artist.coverUrl;
+    else cover.removeAttribute("src");
+    artistAlbumsEl.innerHTML = "";
+    for (const album of detail.albums ?? []) appendAlbumCard(artistAlbumsEl, album, "artist");
+    searchStatus.textContent = `${detail.albums?.length ?? 0} releases`;
+  } catch (error) {
+    searchStatus.textContent = error.message;
+  }
+}
+
 async function play(body) {
   searchStatus.textContent = "Sending to Rou…";
   try {
@@ -378,17 +503,25 @@ document.querySelector("#search-form").addEventListener("submit", async (event) 
   if (!query) return;
   searchStatus.textContent = "Searching…";
   try {
-    renderAlbums(await api(`/api/search?q=${encodeURIComponent(query)}`));
+    renderSearch(await api(`/api/search?q=${encodeURIComponent(query)}`));
   } catch (error) {
     searchStatus.textContent = error.message;
   }
 });
 
-document.querySelector("#back-btn").addEventListener("click", showBrowse);
+document.querySelector("#back-btn").addEventListener("click", () => {
+  if (albumReturn === "artist" && openArtist) {
+    showArtist();
+    searchStatus.textContent = `${openArtist.albums?.length ?? 0} releases`;
+    return;
+  }
+  showBrowse();
+});
+document.querySelector("#artist-back-btn").addEventListener("click", showBrowse);
 document.querySelector("#queue-album-btn").addEventListener("click", () => void queueOpenAlbum());
 document.querySelector("#album").addEventListener("click", () => {
   const id = document.querySelector("#album").dataset.albumId;
-  if (id) void openAlbumView(id);
+  if (id) void openAlbumView(id, "browse");
 });
 
 document.querySelector(".transport").addEventListener("click", async (event) => {

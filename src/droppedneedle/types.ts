@@ -54,6 +54,9 @@ export type CatalogSearchResult = {
   album_thumb_url?: string | null;
   thumb_url?: string | null;
   fanart_url?: string | null;
+  banner_url?: string | null;
+  disambiguation?: string | null;
+  score?: number;
 };
 
 export type CatalogAlbumBasic = {
@@ -131,6 +134,32 @@ export type NeedleRequestHistoryResponse = {
 export type CatalogSearchResponse = {
   artists?: CatalogSearchResult[];
   albums?: CatalogSearchResult[];
+  top_artist?: CatalogSearchResult | null;
+  top_album?: CatalogSearchResult | null;
+};
+
+export type CatalogArtistInfo = {
+  name: string;
+  musicbrainz_id: string;
+  disambiguation?: string | null;
+  image?: string | null;
+  fanart_url?: string | null;
+  thumb_url?: string | null;
+};
+
+export type ArtistReleaseItem = {
+  id?: string | null;
+  title?: string | null;
+  type?: string | null;
+  year?: number | null;
+  in_library?: boolean;
+  requested?: boolean;
+};
+
+export type ArtistReleases = {
+  albums?: ArtistReleaseItem[];
+  singles?: ArtistReleaseItem[];
+  eps?: ArtistReleaseItem[];
 };
 
 export type HealthResponse = {
@@ -163,6 +192,19 @@ export type NativeLibraryAlbum = {
   musicbrainz_release_group_id?: string | null;
   cover_available?: boolean;
   track_count?: number;
+};
+
+export type NativeLibraryArtist = {
+  id: string;
+  name: string;
+  musicbrainz_artist_id?: string | null;
+  album_count?: number;
+  track_count?: number;
+};
+
+export type NativeLibraryArtistsResponse = {
+  items?: NativeLibraryArtist[];
+  total?: number;
 };
 
 export type NativeLibraryAlbumsResponse = {
