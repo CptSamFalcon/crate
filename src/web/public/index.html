@@ -4,25 +4,34 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Rou</title>
+    <link rel="icon" href="/rou.png" />
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
     <div id="login" class="screen hidden">
       <div class="login-card">
+        <img class="rou-hero" src="/rou.png" alt="Rou" />
         <p class="eyebrow">DroppedNeedle remote</p>
         <h1>Rou</h1>
-        <p>Sign in with Discord to search the library and control the queue. Audio still plays in the voice channel.</p>
+        <p>Sign in with Discord. Browse albums, queue tracks, and Rou plays them in the voice channel.</p>
         <p id="login-error" class="error hidden"></p>
         <a class="btn primary" href="/auth/discord">Continue with Discord</a>
       </div>
     </div>
 
-    <div id="app" class="screen hidden">
-      <header class="top">
-        <div>
-          <p class="eyebrow">Rou</p>
-          <h1>Now playing</h1>
+    <div id="app" class="app hidden">
+      <header class="mast">
+        <div class="brand">
+          <img class="rou-stamp" src="/rou.png" alt="" />
+          <div>
+            <p class="eyebrow">Rou</p>
+            <strong>Crate</strong>
+          </div>
         </div>
+        <form id="search-form" class="search">
+          <input id="query" type="search" placeholder="Search a song, artist, or album" maxlength="200" required />
+          <button type="submit" class="btn primary">Search</button>
+        </form>
         <div class="user">
           <img id="avatar" alt="" width="32" height="32" />
           <span id="username"></span>
@@ -30,16 +39,16 @@
         </div>
       </header>
 
-      <section class="now">
+      <section class="now" id="now">
         <div class="cover" id="cover-wrap">
           <img id="cover" alt="" />
-          <div class="cover-fallback" id="cover-fallback">Rou</div>
+          <img class="cover-fallback-rou" src="/rou.png" alt="" />
         </div>
         <div class="now-meta">
-          <p id="channel" class="muted">Not in a voice channel</p>
-          <h2 id="title">Nothing playing</h2>
-          <p id="artist" class="muted">Search your library to start</p>
-          <p id="album"></p>
+          <p id="channel" class="muted channel">Not in a voice channel</p>
+          <h1 id="title">Nothing playing</h1>
+          <p id="artist" class="muted">Search the crate</p>
+          <button type="button" class="album-link" id="album"></button>
           <p id="elapsed" class="muted"></p>
           <div class="transport">
             <button type="button" data-action="pause" class="btn">Pause</button>
@@ -55,21 +64,32 @@
         </div>
       </section>
 
-      <section class="panel">
-        <form id="search-form">
-          <input id="query" type="search" placeholder="Song, artist, or album" maxlength="200" required />
-          <button type="submit" class="btn">Search</button>
-          <button type="button" class="btn primary" id="play-btn">Play</button>
-          <button type="button" class="btn" id="album-btn">Queue album</button>
-        </form>
-        <p id="search-status" class="muted"></p>
-        <ul id="results" class="list"></ul>
-      </section>
-
-      <section class="panel">
-        <h2>Queue</h2>
-        <ul id="queue" class="list"></ul>
-      </section>
+      <div class="workspace">
+        <section class="panel crate">
+          <div id="browse">
+            <p id="search-status" class="muted">Search for an artist or a song. Rou shows the albums.</p>
+            <div id="results" class="album-grid"></div>
+          </div>
+          <div id="album-view" class="hidden">
+            <button type="button" class="btn" id="back-btn">Back to albums</button>
+            <div class="album-hero">
+              <img id="album-cover" alt="" />
+              <div>
+                <p class="eyebrow" id="album-year"></p>
+                <h2 id="album-title"></h2>
+                <p id="album-artist" class="muted"></p>
+                <p id="album-matched" class="chip hidden"></p>
+                <button type="button" class="btn primary" id="queue-album-btn">Queue album</button>
+              </div>
+            </div>
+            <ol id="album-tracks" class="tracklist"></ol>
+          </div>
+        </section>
+        <aside class="panel queue-panel">
+          <h2>Queue</h2>
+          <ol id="queue" class="tracklist compact"></ol>
+        </aside>
+      </div>
     </div>
     <script src="/app.js"></script>
   </body>

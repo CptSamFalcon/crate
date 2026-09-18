@@ -8,6 +8,9 @@ const volumeInput = document.querySelector("#volume");
 const volumeLabel = document.querySelector("#volume-label");
 const coverEl = document.querySelector("#cover");
 const coverWrap = document.querySelector("#cover-wrap");
+const browseEl = document.querySelector("#browse");
+const albumView = document.querySelector("#album-view");
+const albumTracksEl = document.querySelector("#album-tracks");
 
 coverEl.addEventListener("error", () => {
   const current = status?.nowPlaying;
@@ -29,6 +32,7 @@ const LOGIN_ERRORS = {
 
 let status = null;
 let elapsedTimer = null;
+let openAlbum = null;
 
 function formatDuration(seconds) {
   if (!seconds || seconds <= 0) return "?:??";
@@ -70,20 +74,24 @@ async function api(path, options) {
   return data;
 }
 
-function trackLine(track) {
-  return `${track.title} — ${track.artist}`;
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
 }
 
 function renderStatus(next) {
   status = next;
   const current = next.nowPlaying;
   document.querySelector("#title").textContent = current ? current.title : "Nothing playing";
-  document.querySelector("#artist").textContent = current
-    ? current.artist
-    : "Search your library to start";
-  document.querySelector("#album").textContent = current ? current.album : "";
+  document.querySelector("#artist").textContent = current ? current.artist : "Search the crate";
+  const albumBtn = document.querySelector("#album");
+  albumBtn.textContent = current?.album ?? "";
+  albumBtn.dataset.albumId = current?.albumMbid ?? "";
   document.querySelector("#channel").textContent = next.channelName
-    ? `In ${next.channelName}${next.paused ? " · paused" : ""}`
+    ? `${next.paused ? "Paused in" : "Live in"} ${next.channelName}`
     : "Not in a voice channel";
 
   const nextSrc = current?.coverUrl || "";
@@ -104,9 +112,9 @@ function renderStatus(next) {
   if (!current && next.queue.length === 0) {
     queueEl.innerHTML = `<li class="muted">Queue is empty.</li>`;
   } else {
-    for (const [index, track] of next.queue.entries()) {
+    for (const track of next.queue) {
       const item = document.createElement("li");
-      item.innerHTML = `<span>${index + 1}. ${escapeHtml(trackLine(track))} <span class="muted">${formatDuration(track.durationSeconds)}</span></span>`;
+      item.innerHTML = `<span>${escapeHtml(track.title)}</span><span class="muted">${formatDuration(track.durationSeconds)}</span>`;
       queueEl.append(item);
     }
   }
@@ -124,57 +132,108 @@ function tickElapsed() {
   const update = () => {
     const seconds = Math.max(0, Math.floor((Date.now() - current.startedAt) / 1000));
     elapsed.textContent = `${formatDuration(seconds)} / ${formatDuration(current.durationSeconds)}${
-      current.requestedBy ? ` · queued by ${current.requestedBy}` : ""
+      current.requestedBy ? ` · ${current.requestedBy}` : ""
     }`;
   };
   update();
   elapsedTimer = setInterval(update, 1000);
 }
 
-function escapeHtml(value) {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
+function showBrowse() {
+  albumView.classList.add("hidden");
+  browseEl.classList.remove("hidden");
+  openAlbum = null;
 }
 
-function renderResults(payload) {
+function renderAlbums(payload) {
+  showBrowse();
   resultsEl.innerHTML = "";
-  if (payload.tracks?.length) {
-    searchStatus.textContent = `${payload.tracks.length} match${payload.tracks.length === 1 ? "" : "es"}`;
-    for (const track of payload.tracks) {
-      const item = document.createElement("li");
-      const meta = document.createElement("span");
-      meta.innerHTML = `${escapeHtml(trackLine(track))} <span class="muted">${escapeHtml(track.album)} · ${formatDuration(track.durationSeconds)}</span>`;
-      const button = document.createElement("button");
-      button.className = "btn";
-      button.textContent = "Play";
-      button.addEventListener("click", () => play({ fileId: track.fileId }));
-      item.append(meta, button);
-      resultsEl.append(item);
+  if (payload.albums?.length) {
+    searchStatus.textContent = `${payload.albums.length} album${payload.albums.length === 1 ? "" : "s"}`;
+    for (const album of payload.albums) {
+      const card = document.createElement("button");
+      card.type = "button";
+      card.className = "album-card";
+      const art = album.coverUrl
+        ? `<img src="${escapeHtml(album.coverUrl)}" alt="">`
+        : `<img src="/rou.png" alt="">`;
+      card.innerHTML = `${art}<b>${escapeHtml(album.title)}</b><span>${escapeHtml(album.artist)}${
+        album.matchedTrack ? ` · has ${escapeHtml(album.matchedTrack)}` : ""
+      }</span>`;
+      const artImg = card.querySelector("img");
+      artImg?.addEventListener("error", () => {
+        artImg.src = "/rou.png";
+      });
+      card.addEventListener("click", () => void openAlbumView(album.id));
+      resultsEl.append(card);
     }
     return;
   }
-  searchStatus.textContent = payload.message || "No matches.";
+  searchStatus.textContent = payload.message || "No albums in the library.";
   for (const album of payload.catalog ?? []) {
-    const item = document.createElement("li");
-    item.className = "muted";
-    item.textContent = `${album.title}${album.artist ? ` — ${album.artist}` : ""} (${album.inLibrary ? "in library" : "not downloaded"})`;
-    resultsEl.append(item);
+    const card = document.createElement("div");
+    card.className = "muted";
+    card.textContent = `${album.title}${album.artist ? ` — ${album.artist}` : ""} (${album.inLibrary ? "in library" : "not downloaded"})`;
+    resultsEl.append(card);
   }
 }
 
+async function openAlbumView(albumId) {
+  searchStatus.textContent = "Opening album…";
+  const detail = await api(`/api/albums/${encodeURIComponent(albumId)}`);
+  openAlbum = detail;
+  browseEl.classList.add("hidden");
+  albumView.classList.remove("hidden");
+  document.querySelector("#album-title").textContent = detail.album.title;
+  document.querySelector("#album-artist").textContent = detail.album.artist;
+  document.querySelector("#album-year").textContent = detail.album.year ? String(detail.album.year) : "Album";
+  const matched = document.querySelector("#album-matched");
+  if (detail.album.matchedTrack) {
+    matched.textContent = `Matched “${detail.album.matchedTrack}”`;
+    matched.classList.remove("hidden");
+  } else {
+    matched.classList.add("hidden");
+  }
+  const cover = document.querySelector("#album-cover");
+  cover.src = detail.album.coverUrl || "/rou.png";
+  albumTracksEl.innerHTML = "";
+  for (const [index, track] of detail.tracks.entries()) {
+    const item = document.createElement("li");
+    const num = document.createElement("span");
+    num.className = "num";
+    num.textContent = String(track.trackNumber || index + 1);
+    const name = document.createElement("span");
+    name.textContent = track.title;
+    const time = document.createElement("span");
+    time.className = "muted";
+    time.textContent = formatDuration(track.durationSeconds);
+    const add = document.createElement("button");
+    add.className = "btn";
+    add.textContent = "Add";
+    add.addEventListener("click", (event) => {
+      event.stopPropagation();
+      void play({ fileId: track.fileId });
+    });
+    item.append(num, name, time, add);
+    albumTracksEl.append(item);
+  }
+  searchStatus.textContent = `${detail.tracks.length} tracks`;
+}
+
 async function play(body) {
-  searchStatus.textContent = "Joining voice…";
+  searchStatus.textContent = "Sending to Rou…";
   const result = await api("/api/play", { method: "POST", body: JSON.stringify(body) });
   searchStatus.textContent = result.position === 0 ? "Playing now." : `Queued #${result.position}.`;
   if (result.status) renderStatus(result.status);
 }
 
-async function playAlbum(query) {
+async function queueOpenAlbum() {
+  if (!openAlbum?.album.id) return;
   searchStatus.textContent = "Queueing album…";
-  const result = await api("/api/album", { method: "POST", body: JSON.stringify({ query }) });
+  const result = await api("/api/album", {
+    method: "POST",
+    body: JSON.stringify({ albumId: openAlbum.album.id }),
+  });
   searchStatus.textContent = `Queued ${result.count} tracks.`;
   if (result.status) renderStatus(result.status);
 }
@@ -183,32 +242,19 @@ document.querySelector("#search-form").addEventListener("submit", async (event) 
   event.preventDefault();
   const query = document.querySelector("#query").value.trim();
   if (!query) return;
-  searchStatus.textContent = "Searching…";
+  searchStatus.textContent = "Searching crates…";
   try {
-    renderResults(await api(`/api/search?q=${encodeURIComponent(query)}`));
+    renderAlbums(await api(`/api/search?q=${encodeURIComponent(query)}`));
   } catch (error) {
     searchStatus.textContent = error.message;
   }
 });
 
-document.querySelector("#album-btn").addEventListener("click", async () => {
-  const query = document.querySelector("#query").value.trim();
-  if (!query) return;
-  try {
-    await playAlbum(query);
-  } catch (error) {
-    searchStatus.textContent = error.message;
-  }
-});
-
-document.querySelector("#play-btn").addEventListener("click", async () => {
-  const query = document.querySelector("#query").value.trim();
-  if (!query) return;
-  try {
-    await play({ query });
-  } catch (error) {
-    searchStatus.textContent = error.message;
-  }
+document.querySelector("#back-btn").addEventListener("click", showBrowse);
+document.querySelector("#queue-album-btn").addEventListener("click", () => void queueOpenAlbum());
+document.querySelector("#album").addEventListener("click", () => {
+  const id = document.querySelector("#album").dataset.albumId;
+  if (id) void openAlbumView(id);
 });
 
 document.querySelector(".transport").addEventListener("click", async (event) => {
@@ -238,9 +284,7 @@ volumeInput.addEventListener("input", () => {
 async function boot() {
   const params = new URLSearchParams(location.search);
   const loginErrorKey = params.get("error");
-  if (loginErrorKey) {
-    history.replaceState({}, "", "/");
-  }
+  if (loginErrorKey) history.replaceState({}, "", "/");
   try {
     const me = await api("/api/me");
     document.querySelector("#username").textContent = me.globalName || me.username;
@@ -252,9 +296,7 @@ async function boot() {
       if (!event.data) return;
       renderStatus(JSON.parse(event.data));
     });
-    events.onerror = () => {
-      events.close();
-    };
+    events.onerror = () => events.close();
   } catch {
     showLogin(LOGIN_ERRORS[loginErrorKey] || (loginErrorKey ? LOGIN_ERRORS.oauth : ""));
   }

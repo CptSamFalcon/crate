@@ -113,4 +113,5 @@ export type PlayableTrack = {
   coverUrl: string | null;
   albumMbid: string | null;
   streamUrl: string | null;
+  trackNumber?: number | null;
 };

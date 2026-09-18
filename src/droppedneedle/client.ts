@@ -151,6 +151,10 @@ export class DroppedNeedleClient {
     return `${this.baseUrl}/api/v1/stream/local/${encodeURIComponent(fileId)}`;
   }
 
+  nativeArtworkUrl(albumId: string): string {
+    return `${this.baseUrl}/api/v1/library/albums/${encodeURIComponent(albumId)}/artwork/cached`;
+  }
+
   resolveUrl(maybeRelative: string | null | undefined): string | null {
     if (!maybeRelative) return null;
     try {
@@ -222,6 +226,7 @@ export class DroppedNeedleClient {
       coverUrl: this.resolveUrl(track.cover_url),
       albumMbid: track.album_mbid ?? null,
       streamUrl: this.streamUrl(track.track_file_id),
+      trackNumber: null,
     };
   }
 
@@ -235,6 +240,7 @@ export class DroppedNeedleClient {
       coverUrl: this.resolveUrl(album.cover_url),
       albumMbid: album.musicbrainz_id,
       streamUrl: this.streamUrl(track.track_file_id),
+      trackNumber: track.track_number ?? null,
     };
   }
 
@@ -253,6 +259,7 @@ export class DroppedNeedleClient {
         : null,
       albumMbid: track.musicbrainz_release_group_id ?? null,
       streamUrl,
+      trackNumber: track.track_number ?? null,
     };
   }
 

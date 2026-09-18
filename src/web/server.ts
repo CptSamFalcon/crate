@@ -8,10 +8,13 @@ import { streamSSE } from "hono/streaming";
 import type { AppConfig, WebConfig } from "../config.js";
 import type { DroppedNeedleClient } from "../droppedneedle/client.js";
 import {
-  coverUrlFor,
   coverArtArchiveUrl,
+  coverUrlFor,
   findAlbum,
+  findAlbums,
   findTracks,
+  getAlbum,
+  getAlbumTracksById,
   missingLibrary,
   playableFromId,
   serializeTrack,
@@ -90,6 +93,7 @@ export function startWeb(deps: WebDeps): void {
   app.get("/", () => publicFile("index.html", "text/html; charset=utf-8"));
   app.get("/app.js", () => publicFile("app.js", "text/javascript; charset=utf-8"));
   app.get("/styles.css", () => publicFile("styles.css", "text/css; charset=utf-8"));
+  app.get("/rou.png", () => publicFile("rou.png", "image/png"));
 
   app.get("/auth/discord", (c) => c.redirect(beginOAuth(c, web, clientId)));
   app.get("/logout", (c) => {
@@ -145,12 +149,19 @@ export function startWeb(deps: WebDeps): void {
   api.get("/search", async (c) => {
     const query = c.req.query("q")?.trim() ?? "";
     if (!query) return c.json({ error: "Missing query" }, 400);
-    const tracks = await findTracks(needle, query);
-    if (tracks.length === 0) {
+    const albums = await findAlbums(needle, query);
+    if (albums.length === 0) {
       const miss = await missingLibrary(needle, query);
-      return c.json({ tracks: [], message: miss.message, catalog: miss.catalog });
+      return c.json({ albums: [], message: miss.message, catalog: miss.catalog });
     }
-    return c.json({ tracks: tracks.map(serializeTrack), message: null, catalog: [] });
+    return c.json({ albums, message: null, catalog: [] });
+  });
+
+  api.get("/albums/:id", async (c) => {
+    const id = decodeURIComponent(c.req.param("id"));
+    const detail = await getAlbum(needle, id);
+    if (!detail) return c.json({ error: "Album not found" }, 404);
+    return c.json(detail);
   });
 
   api.post("/play", async (c) => {
@@ -179,12 +190,15 @@ export function startWeb(deps: WebDeps): void {
 
   api.post("/album", async (c) => {
     const user = c.get("user") as SessionUser;
-    const body = (await c.req.json().catch(() => ({}))) as { query?: string };
+    const body = (await c.req.json().catch(() => ({}))) as { query?: string; albumId?: string };
     const query = body.query?.trim() ?? "";
-    if (!query) return c.json({ error: "Missing query" }, 400);
-    const tracks = await findAlbum(needle, query);
+    const tracks = body.albumId
+      ? await getAlbumTracksById(needle, body.albumId)
+      : query
+        ? await findAlbum(needle, query)
+        : [];
     if (tracks.length === 0) {
-      const miss = await missingLibrary(needle, query);
+      const miss = await missingLibrary(needle, query || "that album");
       return c.json({ error: miss.message, catalog: miss.catalog }, 404);
     }
     const channel = await pickVoiceChannel(client, web.guildId, player.channelId);
@@ -219,8 +233,11 @@ export function startWeb(deps: WebDeps): void {
 
   api.get("/cover", async (c) => {
     const id = c.req.query("id");
-    if (!id) return new Response(null, { status: 400 });
-    const url = coverUrlFor(id) ?? coverArtArchiveUrl(playableFromId(id)?.albumMbid);
+    const albumId = c.req.query("album");
+    if (!id && !albumId) return new Response(null, { status: 400 });
+    const url = albumId
+      ? coverUrlFor(albumId)
+      : coverUrlFor(id!) ?? coverArtArchiveUrl(playableFromId(id!)?.albumMbid);
     if (!url) return new Response(null, { status: 404 });
     try {
       const response = await needle.fetchCover(url);
@@ -232,7 +249,10 @@ export function startWeb(deps: WebDeps): void {
         },
       });
     } catch (error) {
-      const fallback = coverArtArchiveUrl(playableFromId(id)?.albumMbid);
+      const key = id ?? albumId ?? "";
+      const fallback = coverArtArchiveUrl(
+        playableFromId(key)?.albumMbid ?? (albumId && /^[0-9a-f-]{36}$/i.test(albumId) ? albumId : null),
+      );
       if (fallback && fallback !== url) {
         try {
           const response = await needle.fetchCover(fallback);
