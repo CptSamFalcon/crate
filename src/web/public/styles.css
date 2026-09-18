@@ -846,6 +846,12 @@ body.is-party .control-party .party-collapse {
   padding: 0;
 }
 
+.played-list {
+  max-height: min(280px, 36vh);
+  overflow: auto;
+  scrollbar-width: thin;
+}
+
 .queue-list li,
 .request-list li {
   display: grid;
@@ -862,6 +868,10 @@ body.is-party .control-party .party-collapse {
   grid-template-columns: minmax(0, 1fr) auto auto;
 }
 
+.played-list li {
+  grid-template-columns: 36px minmax(0, 1fr) auto auto;
+}
+
 .queue-list li.is-now {
   padding-bottom: 12px;
   margin-bottom: 6px;
@@ -873,7 +883,8 @@ body.is-party .control-party .party-collapse {
 }
 
 .queue-list li:hover,
-.request-list li:hover {
+.request-list li:hover,
+.played-list li:hover {
   background: rgb(255 255 255 / 0.04);
 }
 
@@ -995,6 +1006,13 @@ body.is-party .control-party .party-collapse {
   grid-column: 1 / -1;
 }
 
+.played-list .action-btn {
+  justify-self: end;
+  opacity: 1;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
 .request-list li[data-album-id] {
   cursor: pointer;
 }
@@ -1079,6 +1097,10 @@ body.has-library .rail {
   overflow: auto;
   padding-top: 0;
   scrollbar-width: thin;
+}
+
+body.has-library .played-list {
+  max-height: none;
 }
 
 body.has-library .library {
@@ -1542,6 +1564,18 @@ body.is-party .ambient {
   .rail-card + .rail-card {
     border-top: 0;
     border-left: 1px solid var(--line);
+  }
+
+  .rail-card:nth-child(2n + 1) {
+    border-left: 0;
+  }
+
+  .rail-card:nth-child(n + 3) {
+    border-top: 1px solid var(--line);
+  }
+
+  .played-list {
+    max-height: min(220px, 30vh);
   }
 }
 

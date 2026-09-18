@@ -3,6 +3,7 @@ const appEl = document.querySelector("#app");
 const loginError = document.querySelector("#login-error");
 const resultsEl = document.querySelector("#results");
 const queueEl = document.querySelector("#queue");
+const playedEl = document.querySelector("#played");
 const requestsEl = document.querySelector("#requests");
 const searchStatus = document.querySelector("#search-status");
 const volumeInput = document.querySelector("#volume");
@@ -211,6 +212,7 @@ function renderStatus(next) {
   volumeInput.disabled = locked;
   setVolumeFill(next.volume);
   renderQueue(current, next.queue ?? []);
+  renderPlayed(next.played ?? [], next.canControl !== false);
   renderTransport(next);
   tickElapsed();
 }
@@ -286,6 +288,32 @@ function renderQueue(current, queue) {
     item.append(remove);
     queueEl.append(item);
   });
+}
+
+function renderPlayed(played, canPlay) {
+  playedEl.innerHTML = "";
+  document.querySelector("#played-count").textContent = played.length ? String(played.length) : "";
+  if (played.length === 0) {
+    playedEl.innerHTML = `<li class="empty-row">Nothing played yet.</li>`;
+    return;
+  }
+  for (const track of played) {
+    const item = document.createElement("li");
+    const art = `<span class="queue-thumb">${track.coverUrl ? `<img src="${escapeHtml(track.coverUrl)}" alt="">` : ""}</span>`;
+    const who = track.requestedBy ? ` · ${escapeHtml(track.requestedBy)}` : "";
+    item.innerHTML = `${art}<span class="queue-copy"><b>${escapeHtml(track.title)}</b><small>${escapeHtml(track.artist)}${who}</small></span><span class="muted">${formatDuration(track.durationSeconds)}</span>`;
+    bindCover(item.querySelector("img"));
+    if (canPlay && track.fileId) {
+      const again = document.createElement("button");
+      again.type = "button";
+      again.className = "action-btn";
+      again.textContent = "Play";
+      again.setAttribute("aria-label", `Play ${track.title} again`);
+      again.addEventListener("click", () => void play({ fileId: track.fileId }));
+      item.append(again);
+    }
+    playedEl.append(item);
+  }
 }
 
 function renderGuildPicker(next) {

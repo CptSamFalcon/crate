@@ -26,6 +26,12 @@ export type NowPlaying = {
 };
 
 const MAX_QUEUE = 200;
+export const MAX_PLAYED = 30;
+
+export function rememberPlayedTrack<T extends { fileId: string }>(history: T[], track: T, max = MAX_PLAYED): T[] {
+  if (history[0]?.fileId === track.fileId) return history.slice(0, max);
+  return [track, ...history].slice(0, max);
+}
 
 type StatusListener = () => void;
 
@@ -49,6 +55,7 @@ export class GuildPlayer {
   readonly player: AudioPlayer;
   private connection: VoiceConnection | undefined;
   private readonly queue: QueueItem[] = [];
+  private readonly played: QueueItem[] = [];
   private current: NowPlaying | undefined;
   private stopped = false;
   private starting = false;
@@ -89,6 +96,10 @@ export class GuildPlayer {
 
   get upcoming(): QueueItem[] {
     return [...this.queue];
+  }
+
+  get previouslyPlayed(): QueueItem[] {
+    return [...this.played];
   }
 
   get size(): number {
@@ -208,7 +219,14 @@ export class GuildPlayer {
     });
   }
 
+  private rememberCurrent(): void {
+    const track = this.current?.track;
+    if (!track) return;
+    this.played.splice(0, this.played.length, ...rememberPlayedTrack(this.played, { ...track }));
+  }
+
   private resetPlayback(): QueueItem[] {
+    this.rememberCurrent();
     const tracks = [...(this.current ? [this.current.track] : []), ...this.queue];
     this.stopped = true;
     this.queue.length = 0;
@@ -333,6 +351,7 @@ export class GuildPlayer {
   }
 
   private async advance(): Promise<boolean> {
+    this.rememberCurrent();
     const next = this.queue.shift();
     if (!next) {
       this.current = undefined;
