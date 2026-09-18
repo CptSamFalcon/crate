@@ -23,6 +23,16 @@ services:
     environment:
       TZ: UTC
       NODE_OPTIONS: --dns-result-order=ipv4first
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: rou-tunnel
+    restart: unless-stopped
+    network_mode: host
+    depends_on:
+      - rou
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN}
+    command: tunnel --no-autoupdate run
 ```
 
 `network_mode: host` is required so Discord voice UDP can leave the machine. A Docker bridge network will join the channel, then stall (`signalling` ↔ `connecting`) with no audio. Host networking also exposes the dashboard on `WEB_PORT` (default `8787`).
@@ -54,13 +64,22 @@ WEB_PUBLIC_URL=https://rou.yourdomain
 WEB_PORT=8787
 CLIENT_SECRET=
 GUILD_ID=
+CLOUDFLARE_TUNNEL_TOKEN=
 ```
 
-Discord OAuth only allows HTTP on localhost. For a real hostname, `WEB_PUBLIC_URL` must be HTTPS (same reverse proxy you use for DroppedNeedle, forwarding to the Dockge host on port `8787`).
+Discord OAuth only allows HTTP on localhost, so the public URL must be HTTPS. The `tunnel` service in the compose file is [cloudflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/). Do not put Cloudflare Access in front of this hostname; Discord OAuth is the lock, and Access would intercept `/auth/callback`.
 
-In the Discord Developer Portal, add this exact redirect:
+If this machine already has a tunnel (for example DroppedNeedle), you can skip the `tunnel` service and add a public hostname there instead. Otherwise:
+
+1. Cloudflare Zero Trust → **Networks** → **Tunnels** → **Create a tunnel** → Cloudflared.
+2. Copy the token into `CLOUDFLARE_TUNNEL_TOKEN`.
+3. **Public hostname**: `rou.yourdomain` → type HTTP → URL `http://127.0.0.1:8787`.
+4. Save. Cloudflare will create the DNS record.
+5. In the Discord Developer Portal, add this exact redirect:
 
 `https://rou.yourdomain/auth/callback`
+
+Then **Deploy** (or **Update**) the Dockge stack. Rou logs `web UI on :8787` when the dashboard is enabled. The tunnel logs `Registered tunnel connection` when Cloudflare is up.
 
 `CLIENT_SECRET` is the OAuth2 client secret for the same Discord application as the bot. Only members of `GUILD_ID` can sign in. Playback from the browser stays in the current voice channel, or joins a populated one, then the first joinable channel.
 

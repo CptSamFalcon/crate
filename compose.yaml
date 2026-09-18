@@ -14,3 +14,18 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: rou-tunnel
+    restart: unless-stopped
+    network_mode: host
+    depends_on:
+      - rou
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN}
+    command: tunnel --no-autoupdate run
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

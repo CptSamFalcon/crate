@@ -50,7 +50,7 @@ await client.login(config.DISCORD_TOKEN);
 
 if (config.web) {
   startWeb({ config, web: config.web, client, players, needle });
-} else if (config.WEB_PUBLIC_URL || config.DISCORD_CLIENT_SECRET) {
+} else {
   console.warn("[rou] web UI disabled: set WEB_PUBLIC_URL, CLIENT_SECRET, and GUILD_ID");
 }
 
