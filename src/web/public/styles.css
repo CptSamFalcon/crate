@@ -1054,9 +1054,11 @@ body.has-library .control-play {
 }
 
 body.has-library .rail {
-  max-height: 248px;
+  align-self: stretch;
+  max-height: 340px;
   overflow: auto;
   padding-top: 0;
+  scrollbar-width: thin;
 }
 
 body.has-library .library {
@@ -1317,6 +1319,9 @@ body:not(.has-library) #search-skeleton {
   border-radius: 6px;
   background: #1a1a1e;
   display: block;
+  overflow: hidden;
+  color: transparent;
+  font-size: 0;
 }
 
 #artist-cover {
@@ -1548,6 +1553,14 @@ body.is-party .ambient {
 
   .now-copy {
     text-align: center;
+    max-width: none;
+  }
+
+  .now-copy h1 {
+    font-size: clamp(28px, 9vw, 40px);
+  }
+
+  .progress-block {
     max-width: none;
   }
 

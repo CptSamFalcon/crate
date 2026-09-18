@@ -502,6 +502,16 @@ function bindCover(img) {
   });
 }
 
+function setHeroImage(cover, url) {
+  cover.removeAttribute("src");
+  if (!url) return;
+  const probe = new Image();
+  probe.onload = () => {
+    cover.src = url;
+  };
+  probe.src = url;
+}
+
 function appendAlbumCard(container, album, from) {
   const card = document.createElement("button");
   card.type = "button";
@@ -684,12 +694,7 @@ async function openAlbumView(albumId, from = "browse") {
       matched.classList.add("hidden");
     }
     paintAlbumAction();
-    const cover = document.querySelector("#album-cover");
-    cover.onerror = () => {
-      cover.removeAttribute("src");
-    };
-    if (detail.album.coverUrl) cover.src = detail.album.coverUrl;
-    else cover.removeAttribute("src");
+    setHeroImage(document.querySelector("#album-cover"), detail.album.coverUrl);
     albumTracksEl.innerHTML = "";
     for (const [index, track] of detail.tracks.entries()) {
       const item = document.createElement("li");
@@ -752,12 +757,7 @@ async function openArtistView(artistId) {
       .filter(Boolean)
       .join(" · ");
     document.querySelector("#artist-meta").textContent = meta;
-    const cover = document.querySelector("#artist-cover");
-    cover.onerror = () => {
-      cover.removeAttribute("src");
-    };
-    if (detail.artist.coverUrl) cover.src = detail.artist.coverUrl;
-    else cover.removeAttribute("src");
+    setHeroImage(document.querySelector("#artist-cover"), detail.artist.coverUrl);
     artistAlbumsEl.innerHTML = "";
     for (const album of detail.albums ?? []) appendAlbumCard(artistAlbumsEl, album, "artist");
     setBusy(`${detail.albums?.length ?? 0} releases`);
