@@ -198,6 +198,20 @@ export class DroppedNeedleClient {
     return this.requestJson<NeedleActiveRequestsResponse>("/api/v1/requests/active");
   }
 
+  async cancelRequest(musicbrainzId: string, kind: "album" | "track" = "album"): Promise<{ success?: boolean; message?: string }> {
+    const params = new URLSearchParams({ request_kind: kind });
+    return this.requestJson(`/api/v1/requests/active/${encodeURIComponent(musicbrainzId)}?${params}`, {
+      method: "DELETE",
+    });
+  }
+
+  async rejectRequest(musicbrainzId: string, kind: "album" | "track" = "album"): Promise<{ success?: boolean; message?: string }> {
+    const params = new URLSearchParams({ request_kind: kind });
+    return this.requestJson(`/api/v1/requests/reject/${encodeURIComponent(musicbrainzId)}?${params}`, {
+      method: "POST",
+    });
+  }
+
   async listRequestHistory(page = 1, pageSize = 20): Promise<NeedleRequestHistoryResponse> {
     const params = new URLSearchParams({
       page: String(page),
