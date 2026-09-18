@@ -1,7 +1,7 @@
 services:
-  rou:
-    image: ghcr.io/cptsamfalcon/rou-bot:latest
-    container_name: rou-bot
+  crate:
+    image: ghcr.io/cptsamfalcon/crate:latest
+    container_name: crate
     restart: unless-stopped
     network_mode: host
     # Dashboard binds to 127.0.0.1:WEB_PORT (default 8787). The tunnel reaches it there.
@@ -16,11 +16,11 @@ services:
         max-file: "3"
   tunnel:
     image: cloudflare/cloudflared:latest
-    container_name: rou-tunnel
+    container_name: crate-tunnel
     restart: unless-stopped
     network_mode: host
     depends_on:
-      - rou
+      - crate
     environment:
       TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN}
     command: tunnel --no-autoupdate run

@@ -799,7 +799,7 @@ export async function missingLibrary(
         `Nothing playable in the library matched **${query}**.`,
         "Catalogue hits:",
         ...lines,
-        "Request it from the Rou dashboard, then try again once it imports.",
+        "Request it from the Crate dashboard, then try again once it imports.",
       ].join("\n"),
       catalog: hints,
     };

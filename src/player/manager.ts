@@ -65,7 +65,7 @@ export class GuildPlayer {
       behaviors: { noSubscriber: NoSubscriberBehavior.Play },
     });
     this.player.on("error", (error) => {
-      console.error(`[rou] audio error in guild ${guildId}:`, error);
+      console.error(`[crate] audio error in guild ${guildId}:`, error);
       if (!this.starting) void this.advance();
     });
     this.player.on(AudioPlayerStatus.Idle, () => {
@@ -247,17 +247,17 @@ export class GuildPlayer {
     try {
       connection.destroy();
     } catch (error) {
-      console.warn("[rou] voice destroy failed:", error);
+      console.warn("[crate] voice destroy failed:", error);
     }
   }
 
   private attachConnection(connection: VoiceConnection): void {
     connection.on("error", (error) => {
-      console.error(`[rou] voice connection error in guild ${this.guildId}:`, error);
+      console.error(`[crate] voice connection error in guild ${this.guildId}:`, error);
     });
     connection.on("stateChange", (oldState, newState) => {
       if (oldState.status !== newState.status) {
-        console.log(`[rou] voice ${oldState.status} -> ${newState.status}`);
+        console.log(`[crate] voice ${oldState.status} -> ${newState.status}`);
         this.notify();
       }
     });
@@ -288,7 +288,7 @@ export class GuildPlayer {
             throw new Error("Discord voice connection was replaced before it became ready.");
           }
           existing.subscribe(this.player);
-          console.log("[rou] voice ready");
+          console.log("[crate] voice ready");
           this.notify();
           return;
         } catch (error) {
@@ -313,7 +313,7 @@ export class GuildPlayer {
     });
     this.connection = connection;
     this.attachConnection(connection);
-    console.log(`[rou] joining voice channel ${channel.id}`);
+    console.log(`[crate] joining voice channel ${channel.id}`);
     try {
       await entersState(connection, VoiceConnectionStatus.Ready, 30_000);
     } catch (error) {
@@ -328,7 +328,7 @@ export class GuildPlayer {
       throw new Error("Discord voice connection was replaced before it became ready.");
     }
     connection.subscribe(this.player);
-    console.log("[rou] voice ready");
+    console.log("[crate] voice ready");
     this.notify();
   }
 
@@ -343,14 +343,14 @@ export class GuildPlayer {
       await this.playTrack(next);
       return true;
     } catch (error) {
-      console.error(`[rou] failed to start ${next.title}:`, error);
+      console.error(`[crate] failed to start ${next.title}:`, error);
       return this.advance();
     }
   }
 
   private async playTrack(track: QueueItem): Promise<void> {
     const url = track.streamUrl ?? this.needle.streamUrl(track.fileId);
-    console.log(`[rou] fetching stream for ${track.title} (${url})`);
+    console.log(`[crate] fetching stream for ${track.title} (${url})`);
     this.transcode?.stop();
     this.transcode = undefined;
     const webStream = await this.needle.openStream(track);
@@ -369,7 +369,7 @@ export class GuildPlayer {
     try {
       this.player.play(resource);
       await entersState(this.player, AudioPlayerStatus.Playing, 20_000);
-      console.log(`[rou] playing ${track.title}`);
+      console.log(`[crate] playing ${track.title}`);
     } catch (error) {
       transcode.stop();
       if (this.transcode === transcode) this.transcode = undefined;

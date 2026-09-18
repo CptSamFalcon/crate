@@ -42,7 +42,7 @@ coverEl.addEventListener("load", () => {
 
 const LOGIN_ERRORS = {
   oauth: "Discord login failed. Try again.",
-  not_in_guild: "That Discord account is not in a server with Rou.",
+  not_in_guild: "That Discord account is not in a server with Crate.",
 };
 
 let status = null;
@@ -296,7 +296,7 @@ function renderGuildPicker(next) {
   const icon = document.querySelector("#server-icon");
   const guilds = next.guilds ?? [];
   const active = guilds.find((guild) => guild.id === next.guildId) ?? guilds.find((guild) => guild.active);
-  label.textContent = active?.name || next.guildName || (next.canControl === false ? "Bring Rou here…" : "Choose a server");
+  label.textContent = active?.name || next.guildName || (next.canControl === false ? "Bring Crate here…" : "Choose a server");
   if (active?.iconUrl) {
     icon.src = active.iconUrl;
     icon.classList.remove("hidden");
@@ -332,9 +332,9 @@ function renderGuildPicker(next) {
 }
 
 function channelLabel(channel) {
-  if (channel.you && channel.current) return `${channel.name} · you + Rou`;
+  if (channel.you && channel.current) return `${channel.name} · you + Crate`;
   if (channel.you) return `${channel.name} · you`;
-  if (channel.current) return `${channel.name} · Rou`;
+  if (channel.current) return `${channel.name} · Crate`;
   return channel.name;
 }
 
@@ -660,7 +660,7 @@ function paintAlbumAction() {
   if (!album.id || (!/^[0-9a-f-]{36}$/i.test(album.id) && !openAlbum.tracks.some((track) => track.recordingMbid))) {
     btn.textContent = "Can't request";
     btn.disabled = true;
-    note.textContent = "No MusicBrainz id, so Rou can't request this one.";
+    note.textContent = "No MusicBrainz id, so Crate can't request this one.";
     return;
   }
   if (album.requested) {
@@ -670,7 +670,7 @@ function paintAlbumAction() {
     return;
   }
   btn.textContent = "Request album";
-  note.textContent = "Not on the media server yet. Request it through Rou.";
+  note.textContent = "Not on the media server yet. Request it through Crate.";
 }
 
 async function openAlbumView(albumId, from = "browse") {
@@ -767,7 +767,7 @@ async function openArtistView(artistId) {
 }
 
 async function play(body) {
-  setBusy("Sending to Rou…");
+  setBusy("Sending to Crate…");
   try {
     const result = await api("/api/play", { method: "POST", body: JSON.stringify(body) });
     setBusy(result.position === 0 ? "Playing now." : `Queued #${result.position}.`);
@@ -779,7 +779,7 @@ async function play(body) {
 
 async function requestMedia(body, button) {
   if (button) button.disabled = true;
-  setBusy("Requesting through Rou…");
+  setBusy("Requesting through Crate…");
   try {
     const result = await api("/api/request", { method: "POST", body: JSON.stringify(body) });
     setBusy(result.message || "Requested.");
@@ -828,7 +828,7 @@ async function moveGuild(guildId) {
   if (!pendingGuildId && guildId === status?.guildId) return;
   joining = true;
   renderVoiceState(status ?? {});
-  setBusy("Moving Rou…");
+  setBusy("Moving Crate…");
   try {
     const dest = await api(`/api/channels?guildId=${encodeURIComponent(guildId)}`);
     const yours = dest.channels?.find((channel) => channel.you);
@@ -839,7 +839,7 @@ async function moveGuild(guildId) {
     pendingGuildId = null;
     if (result.status) renderStatus(result.status);
     await refreshChannels();
-    setBusy(result.status?.guildName ? `Rou is in ${result.status.guildName}.` : "Moved.");
+    setBusy(result.status?.guildName ? `Crate is in ${result.status.guildName}.` : "Moved.");
   } catch (error) {
     if (error.status === 409 && error.payload?.channels) {
       pendingGuildId = error.payload.guildId || guildId;
@@ -860,7 +860,7 @@ async function joinChannel(channelId) {
   if (!pendingGuildId && channelId === status?.channelId) return;
   joining = true;
   renderVoiceState(status ?? {});
-  setBusy(pendingGuildId ? "Moving Rou…" : "Joining voice…");
+  setBusy(pendingGuildId ? "Moving Crate…" : "Joining voice…");
   try {
     const result = pendingGuildId
       ? await api("/api/guild", {
@@ -874,7 +874,7 @@ async function joinChannel(channelId) {
     pendingGuildId = null;
     if (result.status) renderStatus(result.status);
     await refreshChannels();
-    setBusy(result.status?.channelName ? `Rou is in ${result.status.channelName}.` : "Joined.");
+    setBusy(result.status?.channelName ? `Crate is in ${result.status.channelName}.` : "Joined.");
   } catch (error) {
     setBusy(error.message);
   } finally {

@@ -11,7 +11,7 @@ import {
 import type { PlayableTrack } from "../droppedneedle/types.js";
 import type { QueueItem } from "../player/manager.js";
 
-export const ACCENT = 0xc45c26;
+export const ACCENT = 0x5865f2;
 
 export const slashCommands = [
   new SlashCommandBuilder()
@@ -44,7 +44,7 @@ export const slashCommands = [
     .addIntegerOption((option) =>
       option.setName("percent").setDescription("0-150").setRequired(true).setMinValue(0).setMaxValue(150),
     ),
-  new SlashCommandBuilder().setName("leave").setDescription("Disconnect Rou from voice"),
+  new SlashCommandBuilder().setName("leave").setDescription("Disconnect Crate from voice"),
 ].map((command) => command.toJSON());
 
 export function voiceChannelOf(interaction: ChatInputCommandInteraction) {
@@ -99,10 +99,10 @@ export function queueEmbed(current: QueueItem | undefined, upcoming: QueueItem[]
 
 export function playbackButtons() {
   return new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder().setCustomId("rou:pause").setLabel("Pause").setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId("rou:resume").setLabel("Resume").setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId("rou:skip").setLabel("Skip").setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId("rou:stop").setLabel("Stop").setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId("crate:pause").setLabel("Pause").setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId("crate:resume").setLabel("Resume").setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId("crate:skip").setLabel("Skip").setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId("crate:stop").setLabel("Stop").setStyle(ButtonStyle.Danger),
   );
 }
 
@@ -114,7 +114,7 @@ export function searchMenu(tracks: PlayableTrack[]) {
   }));
   return new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
     new StringSelectMenuBuilder()
-      .setCustomId("rou:pick")
+      .setCustomId("crate:pick")
       .setPlaceholder("Pick a track to play")
       .addOptions(options),
   );

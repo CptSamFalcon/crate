@@ -97,7 +97,7 @@ export function startWeb(deps: WebDeps): void {
   const { web, client, players, needle } = deps;
   const clientId = deps.config.DISCORD_CLIENT_ID ?? client.user?.id;
   if (!clientId) {
-    console.warn("[rou] web UI disabled: Discord client id is not available yet");
+    console.warn("[crate] web UI disabled: Discord client id is not available yet");
     return;
   }
 
@@ -144,7 +144,7 @@ export function startWeb(deps: WebDeps): void {
           userId: user.id,
           refresh,
         }).catch((error) => {
-          console.warn("[rou] voice channel list failed:", error);
+          console.warn("[crate] voice channel list failed:", error);
           return [];
         }),
       })),
@@ -171,7 +171,6 @@ export function startWeb(deps: WebDeps): void {
   app.get("/", () => publicFile("index.html", "text/html; charset=utf-8"));
   app.get("/app.js", () => publicFile("app.js", "text/javascript; charset=utf-8"));
   app.get("/styles.css", () => publicFile("styles.css", "text/css; charset=utf-8"));
-  app.get("/rou.png", () => publicFile("rou.png", "image/png"));
   const brandFiles: Record<string, string> = {
     "crate-logo.png": "image/png",
     "crate-icon.png": "image/png",
@@ -222,7 +221,7 @@ export function startWeb(deps: WebDeps): void {
     await next();
   });
   api.onError((error, c) => {
-    console.error("[rou] web API error:", error);
+    console.error("[crate] web API error:", error);
     return c.json({ error: "Something went wrong." }, 500);
   });
 
@@ -301,7 +300,7 @@ export function startWeb(deps: WebDeps): void {
       currentChannelId: player.channelId,
       userId: user.id,
     });
-    if (!channel) return c.json({ error: "No voice channel available for Rou to join." }, 409);
+    if (!channel) return c.json({ error: "No voice channel available for Crate to join." }, 409);
     const queued = tracks.map((track) => toQueueItem(track!, displayName(user)));
     const position = await player.enqueue(channel, queued);
     players.leaveOthers(activeGuildId);
@@ -332,7 +331,7 @@ export function startWeb(deps: WebDeps): void {
       currentChannelId: player.channelId,
       userId: user.id,
     });
-    if (!channel) return c.json({ error: "No voice channel available for Rou to join." }, 409);
+    if (!channel) return c.json({ error: "No voice channel available for Crate to join." }, 409);
     const queued = tracks.map((track) => toQueueItem(track, displayName(user)));
     const position = await player.enqueue(channel, queued);
     players.leaveOthers(activeGuildId);
@@ -395,11 +394,11 @@ export function startWeb(deps: WebDeps): void {
     try {
       await needle.cancelRequest(id, kind);
     } catch (error) {
-      console.warn("[rou] cancel request failed:", error);
+      console.warn("[crate] cancel request failed:", error);
       try {
         await needle.rejectRequest(id, kind);
       } catch (rejectError) {
-        console.warn("[rou] reject request failed:", rejectError);
+        console.warn("[crate] reject request failed:", rejectError);
       }
     }
     const snapshot = await listIncomingRequests(needle);
@@ -441,7 +440,7 @@ export function startWeb(deps: WebDeps): void {
       allowEmptyFallback: false,
     });
     if (!channel || channel.id !== channelId) {
-      return c.json({ error: "Rou can't join that voice channel." }, 409);
+      return c.json({ error: "Crate can't join that voice channel." }, 409);
     }
     await currentPlayer().moveTo(channel);
     players.leaveOthers(activeGuildId);
@@ -470,14 +469,14 @@ export function startWeb(deps: WebDeps): void {
     if (guildId === activeGuildId) {
       const channelId = body.channelId?.trim();
       if (channelId) {
-        if (!isSafeId(channelId)) return c.json({ error: "Rou can't join that voice channel." }, 409);
+        if (!isSafeId(channelId)) return c.json({ error: "Crate can't join that voice channel." }, 409);
         const channel = await pickVoiceChannel(client, guildId, {
           preferredChannelId: channelId,
           userId: user.id,
           allowEmptyFallback: false,
         });
         if (!channel || channel.id !== channelId) {
-          return c.json({ error: "Rou can't join that voice channel." }, 409);
+          return c.json({ error: "Crate can't join that voice channel." }, 409);
         }
         await currentPlayer().moveTo(channel);
         players.leaveOthers(activeGuildId);
@@ -609,7 +608,7 @@ export function startWeb(deps: WebDeps): void {
           // fall through
         }
       }
-      console.error("[rou] cover proxy failed:", error);
+      console.error("[crate] cover proxy failed:", error);
       return new Response(null, { status: 502 });
     }
   });
@@ -622,7 +621,7 @@ export function startWeb(deps: WebDeps): void {
   });
 
   serve({ fetch: app.fetch, hostname: web.bind, port: web.port }, (info) => {
-    console.log(`[rou] web UI on http://${web.bind}:${info.port} (${web.publicUrl})`);
+    console.log(`[crate] web UI on http://${web.bind}:${info.port} (${web.publicUrl})`);
   });
 }
 
@@ -679,7 +678,7 @@ async function syncIncoming(deps: {
         moved = true;
       }
     } catch (error) {
-      console.error("[rou] failed to queue a ready request:", error);
+      console.error("[crate] failed to queue a ready request:", error);
     }
   }
 

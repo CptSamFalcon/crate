@@ -1,6 +1,6 @@
-# Rou
+# Crate
 
-Self-hosted Discord music bot that plays from [DroppedNeedle](https://droppedneedle.com).
+Self-hosted Discord listening room that plays from [DroppedNeedle](https://droppedneedle.com).
 
 Slash commands: `/play`, `/album`, `/search`, `/skip`, `/pause`, `/resume`, `/stop`, `/queue`, `/nowplaying`, `/volume`, `/leave`.
 
@@ -8,15 +8,15 @@ Optional web dashboard: search and control the same Discord queue. Audio still o
 
 ## Dockge
 
-The image is `ghcr.io/cptsamfalcon/rou-bot:latest`. Dockge only needs this compose file plus a host `.env` — not the git checkout.
+The image is `ghcr.io/cptsamfalcon/crate:latest`. Dockge only needs this compose file plus a host `.env` — not the git checkout.
 
-1. In Dockge, **+ Compose**, name the stack `rou-bot`, paste:
+1. In Dockge, **+ Compose**, name the stack `crate`, paste:
 
 ```yaml
 services:
-  rou:
-    image: ghcr.io/cptsamfalcon/rou-bot:latest
-    container_name: rou-bot
+  crate:
+    image: ghcr.io/cptsamfalcon/crate:latest
+    container_name: crate
     restart: unless-stopped
     network_mode: host
     env_file: .env
@@ -25,11 +25,11 @@ services:
       NODE_OPTIONS: --dns-result-order=ipv4first
   tunnel:
     image: cloudflare/cloudflared:latest
-    container_name: rou-tunnel
+    container_name: crate-tunnel
     restart: unless-stopped
     network_mode: host
     depends_on:
-      - rou
+      - crate
     environment:
       TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN}
     command: tunnel --no-autoupdate run
@@ -47,7 +47,7 @@ DROPPEDNEEDLE_USERNAME=
 DROPPEDNEEDLE_PASSWORD=
 ```
 
-`TOKEN` is your Discord bot token. Client id is read after login. Use a dedicated DroppedNeedle **Trusted** user for Rou. `DROPPEDNEEDLE_URL` is your DroppedNeedle base URL (no trailing slash).
+`TOKEN` is your Discord bot token. Client id is read after login. Use a dedicated DroppedNeedle **Trusted** user for Crate. `DROPPEDNEEDLE_URL` is your DroppedNeedle base URL (no trailing slash).
 
 3. Deploy. Later updates: Dockge **Update** (pulls a new `:latest`) then start.
 
@@ -60,7 +60,7 @@ If another bot is still using the same Discord token, stop it first.
 The dashboard is off until these are set:
 
 ```env
-WEB_PUBLIC_URL=https://rou.yourdomain
+WEB_PUBLIC_URL=https://crate.yourdomain
 WEB_PORT=8787
 CLIENT_SECRET=
 GUILD_ID=
@@ -74,15 +74,15 @@ If this machine already has a tunnel (for example DroppedNeedle), you can skip t
 
 1. Cloudflare Zero Trust → **Networks** → **Tunnels** → **Create a tunnel** → Cloudflared.
 2. Copy the token into `CLOUDFLARE_TUNNEL_TOKEN`.
-3. **Public hostname**: `rou.yourdomain` → type HTTP → URL `http://127.0.0.1:8787`.
+3. **Public hostname**: `crate.yourdomain` → type HTTP → URL `http://127.0.0.1:8787`.
 4. Save. Cloudflare will create the DNS record.
 5. In the Discord Developer Portal, add this exact redirect:
 
-`https://rou.yourdomain/auth/callback`
+`https://crate.yourdomain/auth/callback`
 
-Then **Deploy** (or **Update**) the Dockge stack. Rou logs `web UI on http://127.0.0.1:8787` when the dashboard is enabled. The tunnel logs `Registered tunnel connection` when Cloudflare is up.
+Then **Deploy** (or **Update**) the Dockge stack. Crate logs `web UI on http://127.0.0.1:8787` when the dashboard is enabled. The tunnel logs `Registered tunnel connection` when Cloudflare is up.
 
-`CLIENT_SECRET` is the OAuth2 client secret for the same Discord application as the bot. Sign-in is limited to members of a server Rou is in, and playback controls only work for the server you're in. Set `SESSION_SECRET` to a long random string so dashboard sessions survive a token rotation. `GUILD_ID` is the default crate server; if Rou is in more than one, pick the server on the dashboard. Slash commands register in every server Rou joins. Playback stays in the voice channel you pick, or the one you're in.
+`CLIENT_SECRET` is the OAuth2 client secret for the same Discord application as the bot. Sign-in is limited to members of a server Crate is in, and playback controls only work for the server you're in. Set `SESSION_SECRET` to a long random string so dashboard sessions survive a token rotation. `GUILD_ID` is the default crate server; if Crate is in more than one, pick the server on the dashboard. Slash commands register in every server Crate joins. Playback stays in the voice channel you pick, or the one you're in.
 
 ## Local run
 

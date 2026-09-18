@@ -345,7 +345,7 @@ export class DroppedNeedleClient {
     }
     return {
       url: track.streamUrl ?? this.streamUrl(track.fileId),
-      ffmpegHeaders: `Authorization: Bearer ${this.token}\r\nUser-Agent: RouDiscordBot/0.1\r\n`,
+      ffmpegHeaders: `Authorization: Bearer ${this.token}\r\nUser-Agent: Crate/0.1\r\n`,
     };
   }
 
@@ -382,7 +382,7 @@ export class DroppedNeedleClient {
       return response;
     }
     const response = await fetch(url, {
-      headers: { Accept: "image/*,*/*", "User-Agent": "RouDiscordBot/0.1" },
+      headers: { Accept: "image/*,*/*", "User-Agent": "Crate/0.1" },
       redirect: "follow",
       signal: AbortSignal.timeout(15_000),
     });
@@ -456,7 +456,7 @@ export class DroppedNeedleClient {
     try {
       resolved = await this.resolveTracks(tracks);
     } catch (error) {
-      console.warn("[rou] resolve-tracks failed, using local stream fallback:", error);
+      console.warn("[crate] resolve-tracks failed, using local stream fallback:", error);
     }
     const playable: PlayableTrack[] = [];
     for (const [index, track] of tracks.entries()) {
@@ -479,7 +479,7 @@ export class DroppedNeedleClient {
       headers: {
         Accept: "application/json",
         "Content-Type": "application/json",
-        "User-Agent": "RouDiscordBot/0.1",
+        "User-Agent": "Crate/0.1",
       },
       body: JSON.stringify({ username, password }),
     });
@@ -511,7 +511,7 @@ export class DroppedNeedleClient {
       }
       const headers = new Headers(init?.headers);
       headers.set("Authorization", `Bearer ${this.token}`);
-      headers.set("User-Agent", "RouDiscordBot/0.1");
+      headers.set("User-Agent", "Crate/0.1");
       if (!isStream && !headers.has("Accept")) {
         headers.set("Accept", "application/json");
       }
