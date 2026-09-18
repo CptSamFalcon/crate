@@ -179,8 +179,8 @@ a {
 }
 
 .wordmark img {
-  width: 36px;
-  height: 36px;
+  width: 34px;
+  height: 32px;
   object-fit: contain;
 }
 
@@ -880,7 +880,7 @@ body.is-party .control-party .party-collapse {
   border-radius: 8px;
   object-fit: cover;
   background-color: var(--surface-2);
-  background-image: url("/brand/crate-icon.png");
+  background-image: url("/brand/crate-mono.png");
   background-repeat: no-repeat;
   background-position: center;
   background-size: 58%;
@@ -1114,9 +1114,10 @@ body:not(.has-library) #search-skeleton {
 }
 
 .empty-mark {
-  width: 88px;
+  width: 72px;
   height: auto;
   margin-bottom: 14px;
+  opacity: 0.92;
 }
 
 .search-section {
@@ -1163,7 +1164,7 @@ body:not(.has-library) #search-skeleton {
   border-radius: 50%;
   overflow: hidden;
   background-color: var(--surface-2);
-  background-image: url("/brand/crate-icon.png");
+  background-image: url("/brand/crate-mono.png");
   background-repeat: no-repeat;
   background-position: center;
   background-size: 42%;
@@ -1215,7 +1216,7 @@ body:not(.has-library) #search-skeleton {
   border-radius: 12px;
   overflow: hidden;
   background-color: var(--surface-2);
-  background-image: url("/brand/crate-icon.png");
+  background-image: url("/brand/crate-mono.png");
   background-repeat: no-repeat;
   background-position: center;
   background-size: 42%;
@@ -1344,7 +1345,7 @@ body:not(.has-library) #search-skeleton {
   object-fit: cover;
   border-radius: 12px;
   background-color: var(--surface-2);
-  background-image: url("/brand/crate-icon.png");
+  background-image: url("/brand/crate-mono.png");
   background-repeat: no-repeat;
   background-position: center;
   background-size: 40%;

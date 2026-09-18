@@ -175,6 +175,7 @@ export function startWeb(deps: WebDeps): void {
   const brandFiles: Record<string, string> = {
     "crate-logo.png": "image/png",
     "crate-icon.png": "image/png",
+    "crate-mono.png": "image/png",
     "crate-favicon.png": "image/png",
     "tokens.css": "text/css; charset=utf-8",
   };
