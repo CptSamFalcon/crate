@@ -39,6 +39,7 @@ export class GuildPlayer {
   private volume = 0.8;
   private transcode: TranscodeSession | undefined;
   private readonly statusListeners = new Set<StatusListener>();
+  private opLock: Promise<void> = Promise.resolve();
 
   constructor(
     readonly guildId: string,
@@ -87,8 +88,13 @@ export class GuildPlayer {
   }
 
   get channelId(): string | undefined {
-    if (this.connection?.state.status !== VoiceConnectionStatus.Ready) return undefined;
-    return this.connection.joinConfig.channelId ?? undefined;
+    const connection = this.connection;
+    if (!connection) return undefined;
+    const status = connection.state.status;
+    if (status === VoiceConnectionStatus.Destroyed || status === VoiceConnectionStatus.Disconnected) {
+      return undefined;
+    }
+    return connection.joinConfig.channelId ?? undefined;
   }
 
   isIdle(): boolean {
@@ -96,21 +102,23 @@ export class GuildPlayer {
   }
 
   async enqueue(channel: VoiceBasedChannel, tracks: QueueItem[]): Promise<number> {
-    if (this.queue.length + tracks.length > MAX_QUEUE) {
-      throw new Error(`Queue would exceed ${MAX_QUEUE} tracks`);
-    }
-    await this.ensureConnected(channel);
-    const startNow = this.isIdle();
-    this.queue.push(...tracks);
-    if (startNow) {
-      const started = await this.advance();
-      if (!started) {
-        throw new Error(`Found ${tracks[0]?.title ?? "a track"} but could not start the audio stream`);
+    return this.withLock(async () => {
+      if (this.queue.length + tracks.length > MAX_QUEUE) {
+        throw new Error(`Queue would exceed ${MAX_QUEUE} tracks`);
       }
-    } else {
-      this.notify();
-    }
-    return startNow ? 0 : this.queue.length - tracks.length + 1;
+      await this.ensureConnected(channel);
+      const startNow = this.isIdle();
+      this.queue.push(...tracks);
+      if (startNow) {
+        const started = await this.advance();
+        if (!started) {
+          throw new Error(`Found ${tracks[0]?.title ?? "a track"} but could not start the audio stream`);
+        }
+      } else {
+        this.notify();
+      }
+      return startNow ? 0 : this.queue.length - tracks.length + 1;
+    });
   }
 
   skip(): QueueItem | undefined {
@@ -151,7 +159,7 @@ export class GuildPlayer {
     this.player.stop(true);
     this.transcode?.stop();
     this.transcode = undefined;
-    this.connection?.destroy();
+    this.destroyConnection(this.connection);
     this.connection = undefined;
     this.stopped = false;
     this.notify();
@@ -161,42 +169,103 @@ export class GuildPlayer {
     for (const listener of this.statusListeners) listener();
   }
 
+  private async withLock<T>(fn: () => Promise<T>): Promise<T> {
+    const waitFor = this.opLock;
+    let release!: () => void;
+    this.opLock = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await waitFor;
+    try {
+      return await fn();
+    } finally {
+      release();
+    }
+  }
+
+  private destroyConnection(connection: VoiceConnection | undefined): void {
+    if (!connection) return;
+    if (this.connection === connection) this.connection = undefined;
+    if (connection.state.status === VoiceConnectionStatus.Destroyed) return;
+    try {
+      connection.destroy();
+    } catch (error) {
+      console.warn("[rou] voice destroy failed:", error);
+    }
+  }
+
+  private attachConnection(connection: VoiceConnection): void {
+    connection.on("error", (error) => {
+      console.error(`[rou] voice connection error in guild ${this.guildId}:`, error);
+    });
+    connection.on("stateChange", (oldState, newState) => {
+      if (oldState.status !== newState.status) {
+        console.log(`[rou] voice ${oldState.status} -> ${newState.status}`);
+        this.notify();
+      }
+    });
+    connection.on(VoiceConnectionStatus.Destroyed, () => {
+      if (this.connection === connection) {
+        this.connection = undefined;
+        this.notify();
+      }
+    });
+  }
+
   private async ensureConnected(channel: VoiceBasedChannel): Promise<void> {
-    if (this.connection?.state.status === VoiceConnectionStatus.Ready && this.connection.joinConfig.channelId === channel.id) {
-      return;
+    const existing = this.connection;
+    if (existing?.joinConfig.channelId === channel.id) {
+      const status = existing.state.status;
+      if (status === VoiceConnectionStatus.Ready) {
+        existing.subscribe(this.player);
+        return;
+      }
+      if (status === VoiceConnectionStatus.Signalling || status === VoiceConnectionStatus.Connecting) {
+        try {
+          await entersState(existing, VoiceConnectionStatus.Ready, 30_000);
+          if (this.connection !== existing) {
+            throw new Error("Discord voice connection was replaced before it became ready.");
+          }
+          existing.subscribe(this.player);
+          console.log("[rou] voice ready");
+          this.notify();
+          return;
+        } catch (error) {
+          this.destroyConnection(existing);
+          throw new Error(
+            "Discord voice never became ready. Need DAVE encryption (@discordjs/voice 0.19) and outbound UDP (network_mode: host).",
+            { cause: error },
+          );
+        }
+      }
     }
-    if (this.connection) {
-      this.connection.destroy();
-    }
-    this.connection = joinVoiceChannel({
+
+    this.destroyConnection(existing);
+
+    const connection = joinVoiceChannel({
       channelId: channel.id,
       guildId: channel.guild.id,
       adapterCreator: channel.guild.voiceAdapterCreator,
       selfDeaf: true,
       daveEncryption: true,
     });
-    this.connection.on("error", (error) => {
-      console.error(`[rou] voice connection error in guild ${this.guildId}:`, error);
-    });
-    this.connection.on("stateChange", (oldState, newState) => {
-      if (oldState.status !== newState.status) {
-        console.log(`[rou] voice ${oldState.status} -> ${newState.status}`);
-        this.notify();
-      }
-    });
+    this.connection = connection;
+    this.attachConnection(connection);
     console.log(`[rou] joining voice channel ${channel.id}`);
     try {
-      await entersState(this.connection, VoiceConnectionStatus.Ready, 20_000);
+      await entersState(connection, VoiceConnectionStatus.Ready, 30_000);
     } catch (error) {
-      this.connection.destroy();
-      this.connection = undefined;
+      this.destroyConnection(connection);
       this.notify();
       throw new Error(
         "Discord voice never became ready. Need DAVE encryption (@discordjs/voice 0.19) and outbound UDP (network_mode: host).",
         { cause: error },
       );
     }
-    this.connection.subscribe(this.player);
+    if (this.connection !== connection || connection.state.status !== VoiceConnectionStatus.Ready) {
+      throw new Error("Discord voice connection was replaced before it became ready.");
+    }
+    connection.subscribe(this.player);
     console.log("[rou] voice ready");
     this.notify();
   }

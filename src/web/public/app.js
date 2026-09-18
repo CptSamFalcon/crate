@@ -145,20 +145,30 @@ function showBrowse() {
   openAlbum = null;
 }
 
+function albumBadge(album) {
+  if (album.inLibrary) return "";
+  return `<span class="badge">${album.requested ? "Requested" : "Request"}</span>`;
+}
+
 function renderAlbums(payload) {
   showBrowse();
   resultsEl.innerHTML = "";
   if (payload.albums?.length) {
-    searchStatus.textContent = `${payload.albums.length} album${payload.albums.length === 1 ? "" : "s"}`;
+    const onCrate = payload.albums.filter((album) => album.inLibrary).length;
+    const toRequest = payload.albums.length - onCrate;
+    const parts = [];
+    if (onCrate) parts.push(`${onCrate} on the crate`);
+    if (toRequest) parts.push(`${toRequest} to request`);
+    searchStatus.textContent = parts.join(" · ");
     for (const album of payload.albums) {
       const card = document.createElement("button");
       card.type = "button";
-      card.className = "album-card";
+      card.className = album.inLibrary ? "album-card" : "album-card requestable";
       const art = album.coverUrl
         ? `<img src="${escapeHtml(album.coverUrl)}" alt="">`
         : `<img src="/rou.png" alt="">`;
-      card.innerHTML = `${art}<b>${escapeHtml(album.title)}</b><span>${escapeHtml(album.artist)}${
-        album.matchedTrack ? ` · has ${escapeHtml(album.matchedTrack)}` : ""
+      card.innerHTML = `<div class="art-wrap">${art}${albumBadge(album)}</div><b>${escapeHtml(album.title)}</b><span>${escapeHtml(album.artist)}${
+        album.matchedTrack ? ` · has ${escapeHtml(album.matchedTrack)}` : album.year ? ` · ${album.year}` : ""
       }</span>`;
       const artImg = card.querySelector("img");
       artImg?.addEventListener("error", () => {
@@ -169,80 +179,161 @@ function renderAlbums(payload) {
     }
     return;
   }
-  searchStatus.textContent = payload.message || "No albums in the library.";
-  for (const album of payload.catalog ?? []) {
-    const card = document.createElement("div");
-    card.className = "muted";
-    card.textContent = `${album.title}${album.artist ? ` — ${album.artist}` : ""} (${album.inLibrary ? "in library" : "not downloaded"})`;
-    resultsEl.append(card);
+  searchStatus.textContent = payload.message || "Nothing matched.";
+}
+
+function paintAlbumAction() {
+  const btn = document.querySelector("#queue-album-btn");
+  const note = document.querySelector("#album-note");
+  if (!openAlbum?.album) return;
+  const album = openAlbum.album;
+  btn.disabled = false;
+  if (album.inLibrary) {
+    btn.textContent = "Queue album";
+    note.classList.add("hidden");
+    note.textContent = "";
+    return;
   }
+  note.classList.remove("hidden");
+  if (!album.id || (!/^[0-9a-f-]{36}$/i.test(album.id) && !openAlbum.tracks.some((track) => track.recordingMbid))) {
+    btn.textContent = "Can't request";
+    btn.disabled = true;
+    note.textContent = "No MusicBrainz id, so Rou can't request this one.";
+    return;
+  }
+  if (album.requested) {
+    btn.textContent = "Requested";
+    btn.disabled = true;
+    note.textContent = "Waiting on DroppedNeedle. It'll land on the crate after it imports.";
+    return;
+  }
+  btn.textContent = "Request album";
+  note.textContent = "Not on the media server yet. Request it through Rou.";
 }
 
 async function openAlbumView(albumId) {
   searchStatus.textContent = "Opening album…";
-  const detail = await api(`/api/albums/${encodeURIComponent(albumId)}`);
-  openAlbum = detail;
-  browseEl.classList.add("hidden");
-  albumView.classList.remove("hidden");
-  document.querySelector("#album-title").textContent = detail.album.title;
-  document.querySelector("#album-artist").textContent = detail.album.artist;
-  document.querySelector("#album-year").textContent = detail.album.year ? String(detail.album.year) : "Album";
-  const matched = document.querySelector("#album-matched");
-  if (detail.album.matchedTrack) {
-    matched.textContent = `Matched “${detail.album.matchedTrack}”`;
-    matched.classList.remove("hidden");
-  } else {
-    matched.classList.add("hidden");
+  try {
+    const detail = await api(`/api/albums/${encodeURIComponent(albumId)}`);
+    openAlbum = detail;
+    browseEl.classList.add("hidden");
+    albumView.classList.remove("hidden");
+    document.querySelector("#album-title").textContent = detail.album.title;
+    document.querySelector("#album-artist").textContent = detail.album.artist;
+    document.querySelector("#album-year").textContent = detail.album.year ? String(detail.album.year) : "Album";
+    const matched = document.querySelector("#album-matched");
+    if (detail.album.matchedTrack) {
+      matched.textContent = `Matched “${detail.album.matchedTrack}”`;
+      matched.classList.remove("hidden");
+    } else {
+      matched.classList.add("hidden");
+    }
+    paintAlbumAction();
+    const cover = document.querySelector("#album-cover");
+    cover.src = detail.album.coverUrl || "/rou.png";
+    cover.onerror = () => {
+      cover.src = "/rou.png";
+    };
+    albumTracksEl.innerHTML = "";
+    for (const [index, track] of detail.tracks.entries()) {
+      const item = document.createElement("li");
+      const num = document.createElement("span");
+      num.className = "num";
+      num.textContent = String(track.trackNumber || index + 1);
+      const name = document.createElement("span");
+      name.textContent = track.title;
+      const time = document.createElement("span");
+      time.className = "muted";
+      time.textContent = formatDuration(track.durationSeconds);
+      const action = document.createElement("button");
+      action.className = "btn";
+      if (track.fileId) {
+        action.textContent = "Add";
+        action.addEventListener("click", (event) => {
+          event.stopPropagation();
+          void play({ fileId: track.fileId });
+        });
+      } else if (track.recordingMbid) {
+        action.textContent = "Request";
+        action.addEventListener("click", (event) => {
+          event.stopPropagation();
+          void requestMedia({
+            albumId: detail.album.id,
+            recordingMbid: track.recordingMbid,
+            title: track.title,
+            durationSeconds: track.durationSeconds,
+          }, action);
+        });
+      } else {
+        action.textContent = "Request";
+        action.disabled = true;
+      }
+      item.append(num, name, time, action);
+      albumTracksEl.append(item);
+    }
+    searchStatus.textContent = detail.album.inLibrary
+      ? `${detail.tracks.length} tracks`
+      : `${detail.tracks.length} tracks · request to add`;
+  } catch (error) {
+    searchStatus.textContent = error.message;
   }
-  const cover = document.querySelector("#album-cover");
-  cover.src = detail.album.coverUrl || "/rou.png";
-  albumTracksEl.innerHTML = "";
-  for (const [index, track] of detail.tracks.entries()) {
-    const item = document.createElement("li");
-    const num = document.createElement("span");
-    num.className = "num";
-    num.textContent = String(track.trackNumber || index + 1);
-    const name = document.createElement("span");
-    name.textContent = track.title;
-    const time = document.createElement("span");
-    time.className = "muted";
-    time.textContent = formatDuration(track.durationSeconds);
-    const add = document.createElement("button");
-    add.className = "btn";
-    add.textContent = "Add";
-    add.addEventListener("click", (event) => {
-      event.stopPropagation();
-      void play({ fileId: track.fileId });
-    });
-    item.append(num, name, time, add);
-    albumTracksEl.append(item);
-  }
-  searchStatus.textContent = `${detail.tracks.length} tracks`;
 }
 
 async function play(body) {
   searchStatus.textContent = "Sending to Rou…";
-  const result = await api("/api/play", { method: "POST", body: JSON.stringify(body) });
-  searchStatus.textContent = result.position === 0 ? "Playing now." : `Queued #${result.position}.`;
-  if (result.status) renderStatus(result.status);
+  try {
+    const result = await api("/api/play", { method: "POST", body: JSON.stringify(body) });
+    searchStatus.textContent = result.position === 0 ? "Playing now." : `Queued #${result.position}.`;
+    if (result.status) renderStatus(result.status);
+  } catch (error) {
+    searchStatus.textContent = error.message;
+  }
+}
+
+async function requestMedia(body, button) {
+  if (button) button.disabled = true;
+  searchStatus.textContent = "Requesting through Rou…";
+  try {
+    const result = await api("/api/request", { method: "POST", body: JSON.stringify(body) });
+    searchStatus.textContent = result.message || "Requested.";
+    if (openAlbum && result.album) {
+      openAlbum.album = result.album;
+      paintAlbumAction();
+    }
+    if (button && !body.recordingMbid) paintAlbumAction();
+    if (button && body.recordingMbid) {
+      button.textContent = result.status === "already_in_library" ? "On crate" : "Requested";
+    }
+  } catch (error) {
+    if (button) button.disabled = false;
+    searchStatus.textContent = error.message;
+  }
 }
 
 async function queueOpenAlbum() {
   if (!openAlbum?.album.id) return;
-  searchStatus.textContent = "Queueing album…";
-  const result = await api("/api/album", {
-    method: "POST",
-    body: JSON.stringify({ albumId: openAlbum.album.id }),
-  });
-  searchStatus.textContent = `Queued ${result.count} tracks.`;
-  if (result.status) renderStatus(result.status);
+  try {
+    if (!openAlbum.album.inLibrary) {
+      await requestMedia({ albumId: openAlbum.album.id }, document.querySelector("#queue-album-btn"));
+      return;
+    }
+    searchStatus.textContent = "Queueing album…";
+    const result = await api("/api/album", {
+      method: "POST",
+      body: JSON.stringify({ albumId: openAlbum.album.id }),
+    });
+    searchStatus.textContent = `Queued ${result.count} tracks.`;
+    if (result.status) renderStatus(result.status);
+  } catch (error) {
+    searchStatus.textContent = error.message;
+  }
 }
 
 document.querySelector("#search-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   const query = document.querySelector("#query").value.trim();
   if (!query) return;
-  searchStatus.textContent = "Searching crates…";
+  searchStatus.textContent = "Searching…";
   try {
     renderAlbums(await api(`/api/search?q=${encodeURIComponent(query)}`));
   } catch (error) {

@@ -49,6 +49,46 @@ export type CatalogSearchResult = {
   artist?: string | null;
   year?: number | null;
   in_library?: boolean;
+  requested?: boolean;
+  cover_url?: string | null;
+  album_thumb_url?: string | null;
+};
+
+export type CatalogAlbumBasic = {
+  title: string;
+  musicbrainz_id: string;
+  artist_name: string;
+  year?: number | null;
+  in_library?: boolean;
+  requested?: boolean;
+  cover_url?: string | null;
+  album_thumb_url?: string | null;
+};
+
+export type CatalogAlbumTrack = {
+  position: number;
+  title: string;
+  disc_number?: number;
+  length?: number | null;
+  recording_id?: string | null;
+};
+
+export type CatalogAlbumTracks = {
+  tracks?: CatalogAlbumTrack[];
+  total_tracks?: number;
+};
+
+export type AlbumRequestResponse = {
+  success?: boolean;
+  message?: string;
+  musicbrainz_id?: string;
+  status?: string;
+};
+
+export type TrackRequestResponse = {
+  status?: string;
+  task_id?: string | null;
+  message?: string;
 };
 
 export type CatalogSearchResponse = {

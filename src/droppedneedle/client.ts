@@ -1,4 +1,7 @@
 import type {
+  AlbumRequestResponse,
+  CatalogAlbumBasic,
+  CatalogAlbumTracks,
   CatalogSearchResponse,
   CrateTrack,
   DroppedNeedleUser,
@@ -12,6 +15,7 @@ import type {
   NativeLibraryTracksResponse,
   PlayableTrack,
   ResolvedTrack,
+  TrackRequestResponse,
 } from "./types.js";
 
 type AuthMode =
@@ -27,6 +31,31 @@ export class DroppedNeedleError extends Error {
     super(message);
     this.name = "DroppedNeedleError";
   }
+}
+
+function messageFromDroppedNeedleBody(body: string | undefined): string | null {
+  if (!body) return null;
+  try {
+    const parsed = JSON.parse(body) as {
+      detail?: unknown;
+      message?: unknown;
+      error?: { message?: unknown };
+    };
+    if (typeof parsed.error?.message === "string" && parsed.error.message.trim()) return parsed.error.message;
+    if (typeof parsed.message === "string" && parsed.message.trim()) return parsed.message;
+    if (typeof parsed.detail === "string" && parsed.detail.trim()) return parsed.detail;
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+export function droppedNeedleMessage(error: unknown, fallback = "DroppedNeedle request failed."): string {
+  if (error instanceof DroppedNeedleError) {
+    return messageFromDroppedNeedleBody(error.body) ?? (error.message.trim() || fallback);
+  }
+  if (error instanceof Error && error.message.trim()) return error.message;
+  return fallback;
 }
 
 export function isPublicCoverUrl(url: string): boolean {
@@ -95,9 +124,59 @@ export class DroppedNeedleClient {
     const params = new URLSearchParams({
       q: query,
       limit_artists: "5",
-      limit_albums: "8",
+      limit_albums: "16",
     });
     return this.requestJson<CatalogSearchResponse>(`/api/v1/search?${params}`);
+  }
+
+  async getCatalogAlbumBasic(mbid: string): Promise<CatalogAlbumBasic> {
+    return this.requestJson<CatalogAlbumBasic>(`/api/v1/albums/${encodeURIComponent(mbid)}/basic`);
+  }
+
+  async getCatalogAlbumTracks(mbid: string): Promise<CatalogAlbumTracks> {
+    return this.requestJson<CatalogAlbumTracks>(`/api/v1/albums/${encodeURIComponent(mbid)}/tracks`);
+  }
+
+  async requestAlbum(input: {
+    musicbrainz_id: string;
+    artist?: string | null;
+    album?: string | null;
+    year?: number | null;
+  }): Promise<AlbumRequestResponse> {
+    return this.requestJson<AlbumRequestResponse>("/api/v1/requests/new", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        musicbrainz_id: input.musicbrainz_id,
+        artist: input.artist ?? null,
+        album: input.album ?? null,
+        year: input.year ?? null,
+      }),
+    });
+  }
+
+  async requestTrack(input: {
+    recordingMbid: string;
+    artistName: string;
+    trackTitle: string;
+    albumTitle?: string | null;
+    durationSeconds?: number | null;
+    releaseGroupMbid?: string | null;
+  }): Promise<TrackRequestResponse> {
+    return this.requestJson<TrackRequestResponse>(
+      `/api/v1/tracks/${encodeURIComponent(input.recordingMbid)}/request`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          artist_name: input.artistName,
+          track_title: input.trackTitle,
+          album_title: input.albumTitle ?? null,
+          duration_seconds: input.durationSeconds ?? null,
+          release_group_mbid: input.releaseGroupMbid ?? null,
+        }),
+      },
+    );
   }
 
   async getAlbumTracks(mbid: string): Promise<LocalTrackInfo[]> {
@@ -368,7 +447,8 @@ export class DroppedNeedleClient {
     if (!response.ok) {
       const body = isStream ? undefined : await response.text().catch(() => undefined);
       throw new DroppedNeedleError(
-        `DroppedNeedle ${init?.method ?? "GET"} ${url} failed (${response.status})`,
+        messageFromDroppedNeedleBody(body) ??
+          `DroppedNeedle ${init?.method ?? "GET"} ${url} failed (${response.status})`,
         response.status,
         body,
       );

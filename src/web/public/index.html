@@ -13,7 +13,7 @@
         <img class="rou-hero" src="/rou.png" alt="Rou" />
         <p class="eyebrow">DroppedNeedle remote</p>
         <h1>Rou</h1>
-        <p>Sign in with Discord. Browse albums, queue tracks, and Rou plays them in the voice channel.</p>
+        <p>Sign in with Discord. Browse any album, queue what’s on the crate, or request what isn’t.</p>
         <p id="login-error" class="error hidden"></p>
         <a class="btn primary" href="/auth/discord">Continue with Discord</a>
       </div>
@@ -29,7 +29,7 @@
           </div>
         </div>
         <form id="search-form" class="search">
-          <input id="query" type="search" placeholder="Search a song, artist, or album" maxlength="200" required />
+          <input id="query" type="search" placeholder="Search any album, artist, or song" maxlength="200" required />
           <button type="submit" class="btn primary">Search</button>
         </form>
         <div class="user">
@@ -67,7 +67,7 @@
       <div class="workspace">
         <section class="panel crate">
           <div id="browse">
-            <p id="search-status" class="muted">Search for an artist or a song. Rou shows the albums.</p>
+            <p id="search-status" class="muted">Search anything. Albums on the crate play; the rest you can request.</p>
             <div id="results" class="album-grid"></div>
           </div>
           <div id="album-view" class="hidden">
@@ -79,7 +79,10 @@
                 <h2 id="album-title"></h2>
                 <p id="album-artist" class="muted"></p>
                 <p id="album-matched" class="chip hidden"></p>
-                <button type="button" class="btn primary" id="queue-album-btn">Queue album</button>
+                <p id="album-note" class="muted hidden"></p>
+                <div class="album-actions">
+                  <button type="button" class="btn primary" id="queue-album-btn">Queue album</button>
+                </div>
               </div>
             </div>
             <ol id="album-tracks" class="tracklist"></ol>

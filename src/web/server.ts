@@ -17,6 +17,7 @@ import {
   getAlbumTracksById,
   missingLibrary,
   playableFromId,
+  requestFromNeedle,
   serializeTrack,
   toQueueItem,
 } from "../library.js";
@@ -151,8 +152,7 @@ export function startWeb(deps: WebDeps): void {
     if (!query) return c.json({ error: "Missing query" }, 400);
     const albums = await findAlbums(needle, query);
     if (albums.length === 0) {
-      const miss = await missingLibrary(needle, query);
-      return c.json({ albums: [], message: miss.message, catalog: miss.catalog });
+      return c.json({ albums: [], message: `Nothing matched “${query}”.`, catalog: [] });
     }
     return c.json({ albums, message: null, catalog: [] });
   });
@@ -211,6 +211,25 @@ export function startWeb(deps: WebDeps): void {
       track: serializeTrack(queued[0]!),
       status: await playerStatus(client, player),
     });
+  });
+
+  api.post("/request", async (c) => {
+    const body = (await c.req.json().catch(() => ({}))) as {
+      albumId?: string;
+      recordingMbid?: string;
+      title?: string;
+      durationSeconds?: number | null;
+    };
+    const albumId = body.albumId?.trim() ?? "";
+    const recordingMbid = body.recordingMbid?.trim() ?? "";
+    if (!albumId && !recordingMbid) return c.json({ error: "Missing album or track to request" }, 400);
+    const result = await requestFromNeedle(needle, {
+      albumId: albumId || undefined,
+      recordingMbid: recordingMbid || undefined,
+      title: body.title,
+      durationSeconds: body.durationSeconds,
+    });
+    return c.json(result);
   });
 
   api.post("/skip", (c) => {

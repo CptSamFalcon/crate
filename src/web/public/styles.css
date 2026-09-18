@@ -279,6 +279,40 @@ a {
   cursor: pointer;
 }
 
+.album-card .art-wrap {
+  position: relative;
+}
+
+.album-card .badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgb(20 14 12 / 0.82);
+  color: var(--accent-ink);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.album-card.requestable .badge {
+  background: var(--accent);
+}
+
+.album-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+  filter: none;
+}
+
 .album-card img,
 #album-cover {
   width: 100%;
@@ -290,7 +324,7 @@ a {
 }
 
 .album-card b,
-.album-card span {
+.album-card > span {
   display: block;
 }
 
@@ -298,7 +332,7 @@ a {
   margin-top: 8px;
 }
 
-.album-card span {
+.album-card > span {
   color: var(--muted);
   font-size: 13px;
 }
