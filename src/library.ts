@@ -1,4 +1,5 @@
 import type { DroppedNeedleClient } from "./droppedneedle/client.js";
+import { isPublicCoverUrl } from "./droppedneedle/client.js";
 import type { PlayableTrack } from "./droppedneedle/types.js";
 import type { QueueItem } from "./player/manager.js";
 
@@ -15,7 +16,16 @@ export function playableFromId(fileId: string): PlayableTrack | undefined {
 }
 
 export function coverUrlFor(fileId: string): string | undefined {
-  return coverById.get(fileId);
+  const stored = coverById.get(fileId);
+  if (stored) return stored;
+  const track = playableById.get(fileId);
+  if (track?.albumMbid) return coverArtArchiveUrl(track.albumMbid) ?? undefined;
+  return undefined;
+}
+
+export function coverArtArchiveUrl(mbid: string | null | undefined): string | null {
+  if (!mbid) return null;
+  return `https://coverartarchive.org/release-group/${encodeURIComponent(mbid)}/front-500`;
 }
 
 export function toQueueItem(track: PlayableTrack, requestedBy: string): QueueItem {
@@ -36,6 +46,14 @@ export type PublicTrack = {
 
 export function serializeTrack(track: PlayableTrack & { requestedBy?: string }): PublicTrack {
   rememberPlayable(track);
+  let coverUrl: string | null = null;
+  if (track.coverUrl && isPublicCoverUrl(track.coverUrl)) {
+    coverUrl = track.coverUrl;
+  } else if (track.coverUrl) {
+    coverUrl = `/api/cover?id=${encodeURIComponent(track.fileId)}`;
+  } else {
+    coverUrl = coverArtArchiveUrl(track.albumMbid);
+  }
   return {
     fileId: track.fileId,
     title: track.title,
@@ -44,7 +62,7 @@ export function serializeTrack(track: PlayableTrack & { requestedBy?: string }):
     durationSeconds: track.durationSeconds,
     albumMbid: track.albumMbid,
     requestedBy: track.requestedBy ?? null,
-    coverUrl: track.coverUrl ? `/api/cover?id=${encodeURIComponent(track.fileId)}` : null,
+    coverUrl,
   };
 }
 

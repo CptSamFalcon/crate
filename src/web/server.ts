@@ -9,6 +9,7 @@ import type { AppConfig, WebConfig } from "../config.js";
 import type { DroppedNeedleClient } from "../droppedneedle/client.js";
 import {
   coverUrlFor,
+  coverArtArchiveUrl,
   findAlbum,
   findTracks,
   missingLibrary,
@@ -219,10 +220,10 @@ export function startWeb(deps: WebDeps): void {
   api.get("/cover", async (c) => {
     const id = c.req.query("id");
     if (!id) return new Response(null, { status: 400 });
-    const url = coverUrlFor(id);
+    const url = coverUrlFor(id) ?? coverArtArchiveUrl(playableFromId(id)?.albumMbid);
     if (!url) return new Response(null, { status: 404 });
     try {
-      const response = await needle.fetchMedia(url);
+      const response = await needle.fetchCover(url);
       if (!response.ok || !response.body) return new Response(null, { status: 502 });
       return new Response(response.body, {
         headers: {
@@ -231,6 +232,22 @@ export function startWeb(deps: WebDeps): void {
         },
       });
     } catch (error) {
+      const fallback = coverArtArchiveUrl(playableFromId(id)?.albumMbid);
+      if (fallback && fallback !== url) {
+        try {
+          const response = await needle.fetchCover(fallback);
+          if (response.ok && response.body) {
+            return new Response(response.body, {
+              headers: {
+                "Content-Type": response.headers.get("content-type") ?? "image/jpeg",
+                "Cache-Control": "private, max-age=3600",
+              },
+            });
+          }
+        } catch {
+          // fall through
+        }
+      }
       console.error("[rou] cover proxy failed:", error);
       return new Response(null, { status: 502 });
     }
@@ -243,8 +260,8 @@ export function startWeb(deps: WebDeps): void {
     return publicFile("index.html", "text/html; charset=utf-8");
   });
 
-  serve({ fetch: app.fetch, port: web.port }, (info) => {
-    console.log(`[rou] web UI on :${info.port} (${web.publicUrl})`);
+  serve({ fetch: app.fetch, hostname: "0.0.0.0", port: web.port }, (info) => {
+    console.log(`[rou] web UI on http://0.0.0.0:${info.port} (${web.publicUrl})`);
   });
 }
 

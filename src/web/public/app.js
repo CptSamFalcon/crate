@@ -6,6 +6,21 @@ const queueEl = document.querySelector("#queue");
 const searchStatus = document.querySelector("#search-status");
 const volumeInput = document.querySelector("#volume");
 const volumeLabel = document.querySelector("#volume-label");
+const coverEl = document.querySelector("#cover");
+const coverWrap = document.querySelector("#cover-wrap");
+
+coverEl.addEventListener("error", () => {
+  const current = status?.nowPlaying;
+  if (current?.albumMbid && coverEl.dataset.fallback !== "caa") {
+    coverEl.dataset.fallback = "caa";
+    coverEl.src = `https://coverartarchive.org/release-group/${current.albumMbid}/front-500`;
+    return;
+  }
+  coverWrap.classList.remove("has-art");
+});
+coverEl.addEventListener("load", () => {
+  if (coverEl.getAttribute("src")) coverWrap.classList.add("has-art");
+});
 
 const LOGIN_ERRORS = {
   oauth: "Discord login failed. Try again.",
@@ -71,14 +86,15 @@ function renderStatus(next) {
     ? `In ${next.channelName}${next.paused ? " · paused" : ""}`
     : "Not in a voice channel";
 
-  const cover = document.querySelector("#cover");
-  const wrap = document.querySelector("#cover-wrap");
-  if (current?.coverUrl) {
-    cover.src = current.coverUrl;
-    wrap.classList.add("has-art");
-  } else {
-    cover.removeAttribute("src");
-    wrap.classList.remove("has-art");
+  const nextSrc = current?.coverUrl || "";
+  if (!nextSrc) {
+    coverEl.removeAttribute("src");
+    delete coverEl.dataset.fallback;
+    coverWrap.classList.remove("has-art");
+  } else if (coverEl.getAttribute("src") !== nextSrc) {
+    delete coverEl.dataset.fallback;
+    coverEl.src = nextSrc;
+    coverWrap.classList.add("has-art");
   }
 
   volumeInput.value = String(next.volume);

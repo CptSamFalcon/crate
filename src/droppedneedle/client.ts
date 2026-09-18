@@ -29,6 +29,20 @@ export class DroppedNeedleError extends Error {
   }
 }
 
+export function isPublicCoverUrl(url: string): boolean {
+  try {
+    const host = new URL(url).hostname;
+    return (
+      host === "coverartarchive.org" ||
+      host.endsWith(".coverartarchive.org") ||
+      host === "archive.org" ||
+      host.endsWith(".archive.org")
+    );
+  } catch {
+    return false;
+  }
+}
+
 export class DroppedNeedleClient {
   private token: string | undefined;
   private readonly auth: AuthMode;
@@ -176,11 +190,26 @@ export class DroppedNeedleClient {
     }
   }
 
-  async fetchMedia(url: string): Promise<Response> {
-    if (!this.isLocalUrl(url)) {
+  async fetchCover(url: string): Promise<Response> {
+    if (this.isLocalUrl(url)) {
+      return this.request(url, { method: "GET" }, true);
+    }
+    if (!isPublicCoverUrl(url)) {
       throw new DroppedNeedleError("Refusing to fetch media off the DroppedNeedle host");
     }
-    return this.request(url, { method: "GET" }, true);
+    const response = await fetch(url, {
+      headers: { Accept: "image/*,*/*", "User-Agent": "RouDiscordBot/0.1" },
+      redirect: "follow",
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!response.ok || !response.body) {
+      throw new DroppedNeedleError(`Cover fetch failed (${response.status})`, response.status);
+    }
+    return response;
+  }
+
+  async fetchMedia(url: string): Promise<Response> {
+    return this.fetchCover(url);
   }
 
   toPlayable(track: CrateTrack): PlayableTrack {

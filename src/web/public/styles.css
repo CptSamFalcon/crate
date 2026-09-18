@@ -105,14 +105,16 @@ h2 {
   background: #2a221c;
 }
 
-.cover img,
-.cover-fallback {
+.cover img {
+  display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
 .cover-fallback {
+  width: 100%;
+  height: 100%;
   display: grid;
   place-items: center;
   color: var(--accent);
