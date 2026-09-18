@@ -125,7 +125,7 @@ export class DroppedNeedleClient {
   async searchCatalog(query: string): Promise<CatalogSearchResponse> {
     const params = new URLSearchParams({
       q: query,
-      limit_artists: "5",
+      limit_artists: "12",
       limit_albums: "16",
     });
     return this.requestJson<CatalogSearchResponse>(`/api/v1/search?${params}`);

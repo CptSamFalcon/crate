@@ -52,6 +52,8 @@ export type CatalogSearchResult = {
   requested?: boolean;
   cover_url?: string | null;
   album_thumb_url?: string | null;
+  thumb_url?: string | null;
+  fanart_url?: string | null;
 };
 
 export type CatalogAlbumBasic = {
@@ -106,6 +108,9 @@ export type NeedleActiveRequest = {
   track_title?: string | null;
   track_release_group_mbid?: string | null;
   in_library?: boolean;
+  requested_by_name?: string | null;
+  eta?: string | null;
+  status_messages?: { title?: string | null; messages?: string[] }[] | null;
 };
 
 export type NeedleRequestHistoryItem = NeedleActiveRequest & {

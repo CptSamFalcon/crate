@@ -534,7 +534,12 @@ export async function requestFromNeedle(
     title?: string;
     durationSeconds?: number | null;
   },
-): Promise<{ status: string; message: string; album: PublicAlbum | null }> {
+): Promise<{
+  status: string;
+  message: string;
+  album: PublicAlbum | null;
+  watch: IncomingWatch | null;
+}> {
   const stored = input.albumId ? albumById.get(input.albumId) : undefined;
   const mbid = stored?.mbid ?? (input.albumId && /^[0-9a-f-]{36}$/i.test(input.albumId) ? input.albumId : null);
 
@@ -549,10 +554,21 @@ export async function requestFromNeedle(
         releaseGroupMbid: mbid,
       });
       const status = result.status ?? "pending";
+      const watch: IncomingWatch = {
+        key: `track:${input.recordingMbid}`,
+        kind: "track",
+        id: input.recordingMbid,
+        albumId: mbid,
+        recordingMbid: input.recordingMbid,
+        title: input.title || stored?.title || "Track",
+        artist: stored?.artist || "Unknown artist",
+        requestedBy: "",
+      };
       return {
         status,
         message: describeNeedleRequest(status, result.message),
         album: stored ? serializeAlbum(stored) : null,
+        watch,
       };
     }
 
@@ -570,15 +586,36 @@ export async function requestFromNeedle(
       stored.requested = true;
       albumById.set(stored.id, stored);
     }
+    const watch: IncomingWatch = {
+      key: `album:${mbid}`,
+      kind: "album",
+      id: mbid,
+      albumId: mbid,
+      title: stored?.title || "Album",
+      artist: stored?.artist || "Unknown artist",
+      requestedBy: "",
+    };
     return {
       status,
       message: describeNeedleRequest(status, result.message),
       album: stored ? serializeAlbum(stored) : null,
+      watch,
     };
   } catch (error) {
     throw new Error(droppedNeedleMessage(error));
   }
 }
+
+export type IncomingWatch = {
+  key: string;
+  kind: "album" | "track";
+  id: string;
+  albumId: string | null;
+  recordingMbid?: string;
+  title: string;
+  artist: string;
+  requestedBy: string;
+};
 
 export type IncomingRequest = {
   id: string;
@@ -590,8 +627,10 @@ export type IncomingRequest = {
   statusLabel: string;
   progress: number | null;
   ready: boolean;
+  failed: boolean;
   coverUrl: string | null;
   error: string | null;
+  requestedBy: string | null;
 };
 
 function requestKey(item: { request_kind?: string; musicbrainz_id: string }): string {
@@ -613,16 +652,26 @@ function isRequestReady(item: NeedleActiveRequest): boolean {
 function requestStatusLabel(item: NeedleActiveRequest): string {
   if (isRequestReady(item)) return "Ready";
   const status = (item.download_state || item.download_status || item.status || "").toLowerCase();
+  const percent = progressPercent(item.progress);
+  const headline = item.status_messages?.[0]?.title?.trim();
+  const detail = item.status_messages?.[0]?.messages?.find((line) => line.trim());
   if (status === "awaiting_approval" || status === "pending_approval") return "Needs approval";
-  if (status === "searching" || status === "pending" || status === "queued") return "Searching";
+  if (status === "searching") return headline || "Searching";
+  if (status === "pending" || status === "queued") return headline || "Queued";
   if (status.includes("download")) {
-    const percent = progressPercent(item.progress);
-    return percent != null ? `Downloading ${percent}%` : "Downloading";
+    if (percent != null) return `Downloading ${percent}%`;
+    return headline || detail || "Downloading";
   }
-  if (status === "processing" || status === "importing") return "Importing";
+  if (status === "processing" || status === "importing") return headline || "Importing";
   if (status === "failed" || status === "error") return "Failed";
   if (status === "cancelled" || status === "rejected") return "Cancelled";
+  if (headline) return percent != null ? `${headline} ${percent}%` : headline;
   return item.status || "Requested";
+}
+
+function isRequestFailed(item: NeedleActiveRequest): boolean {
+  const status = (item.download_state || item.download_status || item.status || "").toLowerCase();
+  return status === "failed" || status === "error" || status === "cancelled" || status === "rejected";
 }
 
 function serializeIncoming(needle: DroppedNeedleClient, item: NeedleActiveRequest): IncomingRequest {
@@ -642,30 +691,42 @@ function serializeIncoming(needle: DroppedNeedleClient, item: NeedleActiveReques
     statusLabel: requestStatusLabel(item),
     progress: progressPercent(item.progress),
     ready: isRequestReady(item),
+    failed: isRequestFailed(item),
     coverUrl: cover && isPublicCoverUrl(cover) ? cover : coverArtArchiveUrl(albumId),
     error: item.error_message ?? null,
+    requestedBy: item.requested_by_name ?? null,
   };
 }
 
-export async function listIncomingRequests(needle: DroppedNeedleClient): Promise<IncomingRequest[]> {
+export async function listIncomingRequests(needle: DroppedNeedleClient): Promise<{
+  active: IncomingRequest[];
+  history: IncomingRequest[];
+}> {
   const [active, history] = await Promise.all([
     needle.listActiveRequests().catch(() => ({ items: [] as NeedleActiveRequest[] })),
-    needle.listRequestHistory(1, 20).catch(() => ({ items: [] as NeedleActiveRequest[] })),
+    needle.listRequestHistory(1, 30).catch(() => ({ items: [] as NeedleActiveRequest[] })),
   ]);
-  const seen = new Set<string>();
-  const incoming: IncomingRequest[] = [];
-  for (const item of active.items ?? []) {
-    seen.add(requestKey(item));
-    incoming.push(serializeIncoming(needle, item));
+  return {
+    active: (active.items ?? []).map((item) => serializeIncoming(needle, item)),
+    history: (history.items ?? []).map((item) => serializeIncoming(needle, item)),
+  };
+}
+
+export async function tracksForIncoming(
+  needle: DroppedNeedleClient,
+  watch: IncomingWatch,
+): Promise<PlayableTrack[]> {
+  if (watch.kind === "album" && watch.albumId) {
+    return getAlbumTracksById(needle, watch.albumId);
   }
-  let readyCount = 0;
-  for (const item of history.items ?? []) {
-    const key = requestKey(item);
-    if (seen.has(key) || !isRequestReady(item)) continue;
-    seen.add(key);
-    incoming.push(serializeIncoming(needle, item));
-    readyCount += 1;
-    if (readyCount >= 8) break;
+  if (watch.albumId) {
+    const albumTracks = await getAlbumTracksById(needle, watch.albumId);
+    const wanted = watch.title.toLowerCase();
+    const match = albumTracks.find((track) => track.title.toLowerCase() === wanted);
+    if (match) return [match];
+    if (albumTracks.length > 0 && watch.kind === "track") return albumTracks.slice(0, 1);
+    if (albumTracks.length > 0) return albumTracks;
   }
-  return incoming;
+  if (!watch.title) return [];
+  return findTracks(needle, `${watch.artist} ${watch.title}`.trim(), watch.kind === "track");
 }

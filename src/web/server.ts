@@ -21,6 +21,8 @@ import {
   requestFromNeedle,
   serializeTrack,
   toQueueItem,
+  tracksForIncoming,
+  type IncomingWatch,
 } from "../library.js";
 import type { GuildPlayer, PlayerManager } from "../player/manager.js";
 import {
@@ -215,6 +217,7 @@ export function startWeb(deps: WebDeps): void {
   });
 
   api.post("/request", async (c) => {
+    const user = c.get("user") as SessionUser;
     const body = (await c.req.json().catch(() => ({}))) as {
       albumId?: string;
       recordingMbid?: string;
@@ -230,11 +233,22 @@ export function startWeb(deps: WebDeps): void {
       title: body.title,
       durationSeconds: body.durationSeconds,
     });
+    if (result.watch) {
+      const watch = { ...result.watch, requestedBy: displayName(user) };
+      requestors.set(watch.key, watch.requestedBy);
+      waiting.set(watch.key, watch);
+    }
     return c.json(result);
   });
 
   api.get("/requests", async (c) => {
-    const items = await listIncomingRequests(needle);
+    const snapshot = await listIncomingRequests(needle);
+    const items = snapshot.active
+      .filter((item) => !item.ready && !item.failed)
+      .map((item) => ({
+        ...item,
+        requestedBy: requestors.get(`${item.kind}:${item.id}`) ?? item.requestedBy,
+      }));
     return c.json({ items });
   });
 
@@ -312,4 +326,58 @@ export function startWeb(deps: WebDeps): void {
 
 function displayName(user: SessionUser): string {
   return user.globalName || user.username;
+}
+
+const waiting = new Map<string, IncomingWatch>();
+const requestors = new Map<string, string>();
+
+async function playIncoming(
+  deps: { client: Client; web: WebConfig; player: GuildPlayer; needle: DroppedNeedleClient },
+  watch: IncomingWatch,
+): Promise<boolean> {
+  const tracks = await tracksForIncoming(deps.needle, watch);
+  if (tracks.length === 0) return false;
+  const channel = await pickVoiceChannel(deps.client, deps.web.guildId, deps.player.channelId);
+  if (!channel) return false;
+  await deps.player.enqueue(
+    channel,
+    tracks.map((track) => toQueueItem(track, watch.requestedBy)),
+  );
+  return true;
+}
+
+async function syncIncoming(deps: {
+  client: Client;
+  web: WebConfig;
+  player: GuildPlayer;
+  needle: DroppedNeedleClient;
+}): Promise<{ items: Awaited<ReturnType<typeof listIncomingRequests>>["active"]; moved: boolean }> {
+  const snapshot = await listIncomingRequests(deps.needle);
+  const byKey = new Map(snapshot.active.map((item) => [`${item.kind}:${item.id}`, item]));
+  const historyByKey = new Map(snapshot.history.map((item) => [`${item.kind}:${item.id}`, item]));
+  let moved = false;
+
+  for (const [key, watch] of [...waiting]) {
+    const live = byKey.get(key) ?? historyByKey.get(key);
+    if (live && live.failed) {
+      waiting.delete(key);
+      continue;
+    }
+    if (live && !live.ready) continue;
+    try {
+      if (await playIncoming(deps, watch)) {
+        waiting.delete(key);
+        moved = true;
+      }
+    } catch (error) {
+      console.error("[rou] failed to queue a ready request:", error);
+    }
+  }
+
+  const items = snapshot.active.filter((item) => {
+    const key = `${item.kind}:${item.id}`;
+    if (waiting.has(key)) return true;
+    return !item.ready && !item.failed;
+  });
+  return { items, moved };
 }

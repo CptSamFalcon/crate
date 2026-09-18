@@ -410,6 +410,7 @@ a {
   overflow: hidden;
 }
 
+.tracklist.compact small,
 .request-list small {
   display: block;
   font-size: 12px;

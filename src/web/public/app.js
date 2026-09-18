@@ -90,6 +90,14 @@ function renderStatus(next) {
   const current = next.nowPlaying;
   document.querySelector("#title").textContent = current ? current.title : "Nothing playing";
   document.querySelector("#artist").textContent = current ? current.artist : "Search the crate";
+  const addedBy = document.querySelector("#added-by");
+  if (current?.requestedBy) {
+    addedBy.textContent = `Added by ${current.requestedBy}`;
+    addedBy.classList.remove("hidden");
+  } else {
+    addedBy.textContent = "";
+    addedBy.classList.add("hidden");
+  }
   const albumBtn = document.querySelector("#album");
   albumBtn.textContent = current?.album ?? "";
   albumBtn.dataset.albumId = current?.albumMbid ?? "";
@@ -117,7 +125,8 @@ function renderStatus(next) {
   } else {
     for (const track of next.queue) {
       const item = document.createElement("li");
-      item.innerHTML = `<span>${escapeHtml(track.title)}</span><span class="muted">${formatDuration(track.durationSeconds)}</span>`;
+      const who = track.requestedBy ? `<small class="muted">Added by ${escapeHtml(track.requestedBy)}</small>` : "";
+      item.innerHTML = `<span>${escapeHtml(track.title)}${who}</span><span class="muted">${formatDuration(track.durationSeconds)}</span>`;
       queueEl.append(item);
     }
   }
@@ -140,7 +149,8 @@ function renderRequests(items) {
     const row = document.createElement("li");
     row.className = item.ready ? "ready" : "";
     if (item.albumId) row.dataset.albumId = item.albumId;
-    row.innerHTML = `<span>${escapeHtml(item.title)}<small class="muted"> ${escapeHtml(item.artist)}</small></span><span class="${requestStatusClass(item)}">${escapeHtml(item.statusLabel)}</span>`;
+    const who = item.requestedBy ? `<small class="muted">Requested by ${escapeHtml(item.requestedBy)}</small>` : "";
+    row.innerHTML = `<span>${escapeHtml(item.title)}<small class="muted"> ${escapeHtml(item.artist)}</small>${who}</span><span class="${requestStatusClass(item)}">${escapeHtml(item.statusLabel)}</span>`;
     if (item.albumId) {
       row.addEventListener("click", () => void openAlbumView(item.albumId));
     }
@@ -167,9 +177,7 @@ function tickElapsed() {
   }
   const update = () => {
     const seconds = Math.max(0, Math.floor((Date.now() - current.startedAt) / 1000));
-    elapsed.textContent = `${formatDuration(seconds)} / ${formatDuration(current.durationSeconds)}${
-      current.requestedBy ? ` · ${current.requestedBy}` : ""
-    }`;
+    elapsed.textContent = `${formatDuration(seconds)} / ${formatDuration(current.durationSeconds)}`;
   };
   update();
   elapsedTimer = setInterval(update, 1000);
