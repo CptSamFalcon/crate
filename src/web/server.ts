@@ -102,7 +102,7 @@ export function startWeb(deps: WebDeps): void {
   const app = new Hono();
   let activeGuildId = web.guildId;
   const currentPlayer = () => players.get(activeGuildId);
-  const statusPayload = async () => {
+  const statusPayload = async (userId?: string, refresh = false) => {
     const player = currentPlayer();
     const guild = client.guilds.cache.get(activeGuildId);
     return playerStatus(client, player, {
@@ -111,7 +111,11 @@ export function startWeb(deps: WebDeps): void {
       guilds: listBotGuilds(client).map((item) => ({ ...item, active: item.id === activeGuildId })),
       channels: await listVoiceChannels(client, activeGuildId, {
         botChannelId: player.channelId,
-        refresh: false,
+        userId,
+        refresh,
+      }).catch((error) => {
+        console.warn("[rou] voice channel list failed:", error);
+        return [];
       }),
     });
   };
@@ -157,7 +161,10 @@ export function startWeb(deps: WebDeps): void {
 
   api.get("/me", (c) => c.json(c.get("user")));
 
-  api.get("/status", async (c) => c.json(await statusPayload()));
+  api.get("/status", async (c) => {
+    const user = c.get("user") as SessionUser;
+    return c.json(await statusPayload(user.id, true));
+  });
 
   api.get("/events", async (c) => {
     return streamSSE(c, async (stream) => {

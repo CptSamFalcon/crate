@@ -15,22 +15,41 @@ export type PickVoiceOptions = {
   allowEmptyFallback?: boolean;
 };
 
+function isListedVoiceChannel(
+  channel: { isVoiceBased: () => boolean; type: ChannelType; id: string },
+  afkChannelId: string | null,
+): channel is VoiceBasedChannel {
+  if (!channel.isVoiceBased()) return false;
+  if (channel.type === ChannelType.GuildStageVoice) return false;
+  if (channel.id === afkChannelId) return false;
+  return true;
+}
+
+function botCanConnect(channel: VoiceBasedChannel): boolean {
+  const me = channel.guild.members.me;
+  if (!me) return true;
+  const permissions = channel.permissionsFor(me);
+  if (!permissions) return true;
+  return permissions.has(PermissionFlagsBits.Connect);
+}
+
 async function voiceChannelsOf(client: Client, guildId: string, refresh = true): Promise<VoiceBasedChannel[]> {
   const guild = client.guilds.cache.get(guildId) ?? (await client.guilds.fetch(guildId));
-  if (refresh || guild.channels.cache.size === 0) await guild.channels.fetch();
-  return [...guild.channels.cache.values()]
-    .filter((channel): channel is VoiceBasedChannel => {
-      if (!channel.isVoiceBased()) return false;
-      if (channel.type === ChannelType.GuildStageVoice) return false;
-      if (channel.id === guild.afkChannelId) return false;
-      const me = guild.members.me;
-      if (me && !channel.permissionsFor(me)?.has(PermissionFlagsBits.Connect)) return false;
-      return true;
-    })
-    .sort((left, right) => {
-      const position = left.rawPosition - right.rawPosition;
-      return position !== 0 ? position : left.name.localeCompare(right.name);
-    });
+  const listed = () =>
+    [...guild.channels.cache.values()]
+      .filter((channel): channel is VoiceBasedChannel => isListedVoiceChannel(channel, guild.afkChannelId))
+      .sort((left, right) => {
+        const position = left.rawPosition - right.rawPosition;
+        return position !== 0 ? position : left.name.localeCompare(right.name);
+      });
+
+  let voices = listed();
+  if (refresh || voices.length === 0) {
+    await guild.channels.fetch();
+    voices = listed();
+  }
+  const joinable = voices.filter(botCanConnect);
+  return joinable.length > 0 ? joinable : voices;
 }
 
 export async function listVoiceChannels(

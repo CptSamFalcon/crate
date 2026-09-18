@@ -185,16 +185,17 @@ function channelLabel(channel) {
 function renderChannelPicker(channels, selectedId) {
   const picker = document.querySelector("#channel-picker");
   const select = document.querySelector("#voice-channel");
+  picker.classList.remove("hidden");
   if (!channels.length && !pendingGuildId) {
-    picker.classList.add("hidden");
-    select.innerHTML = "";
-    delete select.dataset.signature;
+    if (select.options.length <= 1) {
+      select.innerHTML = `<option value="">Choose a voice channel</option>`;
+      select.dataset.signature = "empty";
+    }
     return;
   }
-  picker.classList.remove("hidden");
   const signature = `${pendingGuildId || ""}:${channels.map((channel) => channel.id).join(",")}`;
   if (select.dataset.signature !== signature) {
-    const placeholder = pendingGuildId ? "Pick a voice channel…" : "Choose a channel";
+    const placeholder = pendingGuildId ? "Pick a voice channel…" : "Choose a voice channel";
     select.innerHTML = `<option value="">${placeholder}</option>${channels
       .map(
         (channel) =>
@@ -665,6 +666,7 @@ document.querySelector("#guild").addEventListener("change", async (event) => {
     });
     pendingGuildId = null;
     if (result.status) renderStatus(result.status);
+    await refreshChannels();
     searchStatus.textContent = result.status?.guildName
       ? `Rou is in ${result.status.guildName}.`
       : "Moved.";
@@ -704,6 +706,7 @@ document.querySelector("#voice-channel").addEventListener("change", async (event
         });
     pendingGuildId = null;
     if (result.status) renderStatus(result.status);
+    await refreshChannels();
     searchStatus.textContent = result.status?.channelName
       ? `Rou is in ${result.status.channelName}.`
       : "Joined.";
@@ -741,6 +744,17 @@ volumeInput.addEventListener("input", () => {
   }, 150);
 });
 
+async function refreshChannels() {
+  if (pendingGuildId) return;
+  try {
+    const guildId = status?.guildId;
+    const payload = await api(`/api/channels${guildId ? `?guildId=${encodeURIComponent(guildId)}` : ""}`);
+    renderChannelPicker(payload.channels ?? [], status?.channelId);
+  } catch {
+    // Keep whatever the last status payload had.
+  }
+}
+
 async function boot() {
   const params = new URLSearchParams(location.search);
   const loginErrorKey = params.get("error");
@@ -751,6 +765,7 @@ async function boot() {
     document.querySelector("#avatar").src = avatarUrl(me);
     showApp();
     renderStatus(await api("/api/status"));
+    await refreshChannels();
     renderRequests([]);
     await loadRequests();
     requestPoll = window.setInterval(() => void loadRequests(), 10_000);
