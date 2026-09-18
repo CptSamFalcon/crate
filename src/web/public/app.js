@@ -9,11 +9,16 @@ const volumeInput = document.querySelector("#volume");
 const volumeLabel = document.querySelector("#volume-label");
 const coverEl = document.querySelector("#cover");
 const coverWrap = document.querySelector("#cover-wrap");
+const ambientEl = document.querySelector("#ambient");
+const stageEl = document.querySelector("#stage");
 const browseEl = document.querySelector("#browse");
 const albumView = document.querySelector("#album-view");
 const artistView = document.querySelector("#artist-view");
 const albumTracksEl = document.querySelector("#album-tracks");
 const artistAlbumsEl = document.querySelector("#artist-albums");
+const libraryEmpty = document.querySelector("#library-empty");
+const searchSkeleton = document.querySelector("#search-skeleton");
+const playPauseBtn = document.querySelector("#play-pause");
 
 coverEl.addEventListener("error", () => {
   const current = status?.nowPlaying;
@@ -24,9 +29,15 @@ coverEl.addEventListener("error", () => {
   }
   coverEl.removeAttribute("src");
   coverWrap.classList.remove("has-art");
+  stageEl.classList.remove("has-art");
+  ambientEl.removeAttribute("src");
 });
 coverEl.addEventListener("load", () => {
-  if (coverEl.getAttribute("src")) coverWrap.classList.add("has-art");
+  if (!coverEl.getAttribute("src")) return;
+  coverWrap.classList.add("has-art");
+  stageEl.classList.add("has-art");
+  coverWrap.classList.remove("is-swap");
+  if (ambientEl.getAttribute("src") !== coverEl.src) ambientEl.src = coverEl.src;
 });
 
 const LOGIN_ERRORS = {
@@ -41,11 +52,17 @@ let openArtist = null;
 let albumReturn = "browse";
 let requestPoll = 0;
 let pendingGuildId = null;
+let joining = false;
+let hasSearched = false;
+
+function formatClock(seconds) {
+  const whole = Math.max(0, Math.round(seconds || 0));
+  return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, "0")}`;
+}
 
 function formatDuration(seconds) {
   if (!seconds || seconds <= 0) return "?:??";
-  const whole = Math.round(seconds);
-  return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, "0")}`;
+  return formatClock(seconds);
 }
 
 function avatarUrl(user) {
@@ -95,11 +112,57 @@ function escapeHtml(value) {
     .replaceAll('"', "&quot;");
 }
 
+function setBusy(message) {
+  searchStatus.textContent = message;
+}
+
+function closeMenus(except) {
+  for (const menu of document.querySelectorAll(".menu")) {
+    if (menu === except) continue;
+    menu.hidden = true;
+  }
+  for (const button of document.querySelectorAll("[aria-expanded='true']")) {
+    if (except && button.nextElementSibling === except) continue;
+    if (except && button.parentElement?.contains(except)) continue;
+    button.setAttribute("aria-expanded", "false");
+  }
+}
+
+function bindMenu(button, menu) {
+  button.addEventListener("click", (event) => {
+    event.stopPropagation();
+    const open = menu.hidden;
+    closeMenus(open ? menu : null);
+    menu.hidden = !open;
+    button.setAttribute("aria-expanded", String(open));
+  });
+}
+
+bindMenu(document.querySelector("#user-button"), document.querySelector("#user-menu"));
+bindMenu(document.querySelector("#server-button"), document.querySelector("#server-menu"));
+bindMenu(document.querySelector("#channel-button"), document.querySelector("#channel-menu"));
+
+document.addEventListener("click", () => closeMenus());
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    closeMenus();
+    if (document.body.classList.contains("is-party")) exitParty();
+  }
+});
+
 function renderStatus(next) {
   status = next;
   const current = next.nowPlaying;
-  document.querySelector("#title").textContent = current ? current.title : "Nothing playing";
-  document.querySelector("#artist").textContent = current ? current.artist : "Search the crate";
+  const locked = next.canControl === false;
+  document.querySelector("#title").textContent = current ? current.title : "Nothing spinning";
+  document.querySelector("#artist").textContent = current
+    ? current.artist
+    : "Search the crate and put something on.";
+  document.querySelector("#now-eyebrow").textContent = current
+    ? next.paused
+      ? "Paused"
+      : "Now playing"
+    : "Nothing spinning";
   const addedBy = document.querySelector("#added-by");
   if (current?.requestedBy) {
     addedBy.textContent = `Added by ${current.requestedBy}`;
@@ -112,132 +175,202 @@ function renderStatus(next) {
   albumBtn.textContent = current?.album ?? "";
   albumBtn.dataset.albumId = current?.albumMbid ?? "";
   renderGuildPicker(next);
-  const locked = next.canControl === false;
-  document.querySelector(".transport").querySelectorAll("button").forEach((button) => {
-    button.disabled = locked;
-  });
-  volumeInput.disabled = locked;
   if (!pendingGuildId) renderChannelPicker(next.channels ?? [], next.channelId);
-  const place = next.channelName
-    ? `${next.paused ? "Paused in" : "Live in"} ${next.channelName}`
-    : "Not in a voice channel";
-  const suffix = next.guildName && (next.guilds?.length ?? 0) < 2 ? ` · ${next.guildName}` : "";
-  document.querySelector("#channel").textContent = `${place}${suffix}`;
+  renderVoiceState(next);
 
   const nextSrc = current?.coverUrl || "";
   if (!nextSrc) {
     coverEl.removeAttribute("src");
+    ambientEl.removeAttribute("src");
     delete coverEl.dataset.fallback;
-    coverWrap.classList.remove("has-art");
+    coverWrap.classList.remove("has-art", "is-swap");
+    stageEl.classList.remove("has-art");
   } else if (coverEl.getAttribute("src") !== nextSrc) {
+    coverWrap.classList.add("is-swap");
     delete coverEl.dataset.fallback;
     coverEl.src = nextSrc;
-    coverWrap.classList.add("has-art");
   }
 
   volumeInput.value = String(next.volume);
   volumeLabel.textContent = `${next.volume}%`;
-
-  queueEl.innerHTML = "";
-  if (!current && next.queue.length === 0) {
-    queueEl.innerHTML = `<li class="muted">Queue is empty.</li>`;
-  } else {
-    next.queue.forEach((track, index) => {
-      const item = document.createElement("li");
-      const who = track.requestedBy ? `<small class="muted">Added by ${escapeHtml(track.requestedBy)}</small>` : "";
-      item.innerHTML = `<span>${escapeHtml(track.title)}${who}</span><span class="muted">${formatDuration(track.durationSeconds)}</span>`;
-      const remove = document.createElement("button");
-      remove.type = "button";
-      remove.className = "btn";
-      remove.textContent = "Remove";
-      remove.addEventListener("click", () => void removeQueued(index, remove));
-      item.append(remove);
-      queueEl.append(item);
-    });
-  }
+  volumeInput.disabled = locked;
+  renderQueue(current, next.queue ?? []);
+  renderTransport(next);
   tickElapsed();
+}
+
+function renderVoiceState(next) {
+  const connected = Boolean(next.channelId);
+  const label = document.querySelector("#channel-label");
+  const state = document.querySelector("#voice-state");
+  const dot = document.querySelector("#voice-dot");
+  const members = document.querySelector("#member-count");
+  const channel = (next.channels ?? []).find((item) => item.id === next.channelId);
+  if (joining) {
+    state.textContent = "Joining";
+    label.textContent = pendingGuildId ? "Pick a voice channel" : next.channelName || "Voice channel";
+    dot.dataset.state = "busy";
+  } else if (connected) {
+    state.textContent = next.paused ? "Paused" : "Connected";
+    label.textContent = next.channelName || "Voice";
+    dot.dataset.state = next.paused ? "paused" : "on";
+  } else {
+    state.textContent = "Disconnected";
+    label.textContent = "Choose a voice channel";
+    dot.dataset.state = "off";
+  }
+  if (connected && channel?.memberCount) {
+    members.textContent = String(channel.memberCount);
+    members.classList.remove("hidden");
+  } else {
+    members.textContent = "";
+    members.classList.add("hidden");
+  }
+}
+
+function renderTransport(next) {
+  const locked = next.canControl === false;
+  const playing = Boolean(next.nowPlaying);
+  playPauseBtn.disabled = locked || !playing;
+  playPauseBtn.classList.toggle("is-playing", playing && !next.paused);
+  playPauseBtn.dataset.action = next.paused || !playing ? "resume" : "pause";
+  playPauseBtn.setAttribute("aria-label", playing && !next.paused ? "Pause" : "Play");
+  for (const button of document.querySelectorAll(".transport [data-action='skip'], .transport [data-action='stop']")) {
+    button.disabled = locked || !playing;
+  }
+}
+
+function renderQueue(current, queue) {
+  queueEl.innerHTML = "";
+  document.querySelector("#queue-count").textContent = current || queue.length ? String(queue.length) : "";
+  if (!current && queue.length === 0) {
+    queueEl.innerHTML = `<li class="empty-row">Queue is empty.</li>`;
+    return;
+  }
+  queue.forEach((track, index) => {
+    const item = document.createElement("li");
+    const art = `<span class="queue-thumb">${track.coverUrl ? `<img src="${escapeHtml(track.coverUrl)}" alt="">` : ""}</span>`;
+    const who = track.requestedBy ? ` · ${escapeHtml(track.requestedBy)}` : "";
+    item.innerHTML = `${art}<span class="queue-copy"><b>${escapeHtml(track.title)}</b><small>${escapeHtml(track.artist)}${who}</small></span><span class="muted">${formatDuration(track.durationSeconds)}</span>`;
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "ghost-btn";
+    remove.setAttribute("aria-label", `Remove ${track.title}`);
+    remove.innerHTML = `<svg class="icon" aria-hidden="true"><use href="#i-close"></use></svg>`;
+    remove.addEventListener("click", () => void removeQueued(index, remove));
+    item.append(remove);
+    bindCover(item.querySelector("img"));
+    queueEl.append(item);
+  });
 }
 
 function renderGuildPicker(next) {
   const picker = document.querySelector("#server-picker");
-  const select = document.querySelector("#guild");
+  const menu = document.querySelector("#server-menu");
+  const button = document.querySelector("#server-button");
+  const label = document.querySelector("#server-label");
+  const icon = document.querySelector("#server-icon");
   const guilds = next.guilds ?? [];
-  if (guilds.length < 2 && next.canControl !== false) {
-    picker.classList.add("hidden");
-    return;
+  const active = guilds.find((guild) => guild.id === next.guildId) ?? guilds.find((guild) => guild.active);
+  label.textContent = active?.name || next.guildName || (next.canControl === false ? "Bring Rou here…" : "Choose a server");
+  if (active?.iconUrl) {
+    icon.src = active.iconUrl;
+    icon.classList.remove("hidden");
+  } else {
+    icon.removeAttribute("src");
+    icon.classList.add("hidden");
   }
-  picker.classList.remove("hidden");
+  const canSwitch = guilds.length >= 2 || next.canControl === false;
+  button.disabled = !canSwitch;
+  picker.classList.toggle("is-static", !canSwitch);
   const signature = `${next.canControl === false ? "take:" : ""}${guilds.map((guild) => guild.id).join(",")}`;
-  if (select.dataset.signature !== signature) {
-    const placeholder = next.canControl === false ? `<option value="">Bring Rou here…</option>` : "";
-    select.innerHTML =
-      placeholder +
-      guilds.map((guild) => `<option value="${escapeHtml(guild.id)}">${escapeHtml(guild.name)}</option>`).join("");
-    select.dataset.signature = signature;
-  }
-  if (document.activeElement !== select && !pendingGuildId) {
-    select.value = next.guildId || "";
+  if (menu.dataset.signature === signature) return;
+  menu.dataset.signature = signature;
+  menu.innerHTML = "";
+  for (const guild of guilds) {
+    const item = document.createElement("li");
+    const option = document.createElement("button");
+    option.type = "button";
+    option.setAttribute("role", "option");
+    option.dataset.guildId = guild.id;
+    option.setAttribute("aria-selected", String(guild.id === next.guildId));
+    const avatar = guild.iconUrl
+      ? `<img class="picker-avatar" src="${escapeHtml(guild.iconUrl)}" alt="">`
+      : `<span class="picker-avatar"></span>`;
+    option.innerHTML = `${avatar}<span>${escapeHtml(guild.name)}</span>`;
+    option.addEventListener("click", () => {
+      closeMenus();
+      void moveGuild(guild.id);
+    });
+    item.append(option);
+    menu.append(item);
   }
 }
 
 function channelLabel(channel) {
-  const bits = [];
-  if (channel.current) bits.push("Rou");
-  if (channel.you) bits.push("you");
-  if (channel.memberCount) bits.push(`${channel.memberCount}`);
-  return bits.length ? `${channel.name} (${bits.join(", ")})` : channel.name;
+  if (channel.you && channel.current) return `${channel.name} · you + Rou`;
+  if (channel.you) return `${channel.name} · you`;
+  if (channel.current) return `${channel.name} · Rou`;
+  return channel.name;
 }
 
 function renderChannelPicker(channels, selectedId) {
-  const picker = document.querySelector("#channel-picker");
-  const select = document.querySelector("#voice-channel");
-  picker.classList.remove("hidden");
+  const menu = document.querySelector("#channel-menu");
   if (!channels.length && !pendingGuildId) {
-    if (select.options.length <= 1) {
-      select.innerHTML = `<option value="">Choose a voice channel</option>`;
-      select.dataset.signature = "empty";
-    }
+    if (menu.dataset.signature === "empty") return;
+    menu.dataset.signature = "empty";
+    menu.innerHTML = `<li class="empty-row">No voice channels available.</li>`;
     return;
   }
   const signature = `${pendingGuildId || ""}:${channels.map((channel) => channel.id).join(",")}`;
-  if (select.dataset.signature !== signature) {
-    const placeholder = pendingGuildId ? "Pick a voice channel…" : "Choose a voice channel";
-    select.innerHTML = `<option value="">${placeholder}</option>${channels
-      .map(
-        (channel) =>
-          `<option value="${escapeHtml(channel.id)}">${escapeHtml(channelLabel(channel))}</option>`,
-      )
-      .join("")}`;
-    select.dataset.signature = signature;
+  if (menu.dataset.signature === signature) {
+    for (const option of menu.querySelectorAll("[data-channel-id]")) {
+      option.setAttribute("aria-selected", String(option.dataset.channelId === selectedId));
+    }
+    return;
   }
-  if (document.activeElement !== select) {
-    const current = selectedId || "";
-    select.value = current && channels.some((channel) => channel.id === current) ? current : "";
+  menu.dataset.signature = signature;
+  menu.innerHTML = "";
+  for (const channel of channels) {
+    const item = document.createElement("li");
+    const option = document.createElement("button");
+    option.type = "button";
+    option.setAttribute("role", "option");
+    option.dataset.channelId = channel.id;
+    option.setAttribute("aria-selected", String(channel.id === selectedId));
+    const count = channel.memberCount ? `<span class="meta">${channel.memberCount}</span>` : "";
+    option.innerHTML = `<span>${escapeHtml(channelLabel(channel))}</span>${count}`;
+    option.addEventListener("click", () => {
+      closeMenus();
+      void joinChannel(channel.id);
+    });
+    item.append(option);
+    menu.append(item);
   }
 }
 
 function requestStatusClass(item) {
   if (item.ready) return "ready";
   if (item.statusLabel === "Failed" || item.statusLabel === "Cancelled") return "error";
-  return "muted";
+  return "";
 }
 
 function renderRequests(items) {
   requestsEl.innerHTML = "";
+  document.querySelector("#request-count").textContent = items?.length ? String(items.length) : "";
   if (!items?.length) {
-    requestsEl.innerHTML = `<li class="muted">Nothing requested.</li>`;
+    requestsEl.innerHTML = `<li class="empty-row">Nothing requested.</li>`;
     return;
   }
   for (const item of items) {
     const row = document.createElement("li");
-    row.className = item.ready ? "ready" : "";
     if (item.albumId) row.dataset.albumId = item.albumId;
-    const who = item.requestedBy ? `<small class="muted">Requested by ${escapeHtml(item.requestedBy)}</small>` : "";
-    row.innerHTML = `<span>${escapeHtml(item.title)}<small class="muted"> ${escapeHtml(item.artist)}</small>${who}</span><span class="${requestStatusClass(item)}">${escapeHtml(item.statusLabel)}</span>`;
+    row.innerHTML = `<span class="request-copy"><b>${escapeHtml(item.title)}</b><small>${escapeHtml(item.artist)}${item.requestedBy ? ` · ${escapeHtml(item.requestedBy)}` : ""}</small></span><span class="status ${requestStatusClass(item)}">${escapeHtml(item.statusLabel)}</span>`;
     const remove = document.createElement("button");
     remove.type = "button";
-    remove.className = "btn";
-    remove.textContent = "Remove";
+    remove.className = "ghost-btn";
+    remove.setAttribute("aria-label", `Remove request ${item.title}`);
+    remove.innerHTML = `<svg class="icon" aria-hidden="true"><use href="#i-close"></use></svg>`;
     remove.addEventListener("click", (event) => {
       event.stopPropagation();
       void removeRequest(item, remove);
@@ -270,10 +403,10 @@ async function removeQueued(index, button) {
       body: JSON.stringify({ index }),
     });
     if (result.status) renderStatus(result.status);
-    searchStatus.textContent = "Removed from the queue.";
+    setBusy("Removed from the queue.");
   } catch (error) {
     if (button) button.disabled = false;
-    searchStatus.textContent = error.message;
+    setBusy(error.message);
   }
 }
 
@@ -285,24 +418,31 @@ async function removeRequest(item, button) {
       body: JSON.stringify({ id: item.id, kind: item.kind }),
     });
     renderRequests(result.items ?? []);
-    searchStatus.textContent = "Removed from Requests.";
+    setBusy("Removed from Requests.");
   } catch (error) {
     if (button) button.disabled = false;
-    searchStatus.textContent = error.message;
+    setBusy(error.message);
   }
 }
 
 function tickElapsed() {
   clearInterval(elapsedTimer);
   const elapsed = document.querySelector("#elapsed");
+  const duration = document.querySelector("#duration");
+  const progress = document.querySelector("#progress");
   const current = status?.nowPlaying;
   if (!current) {
-    elapsed.textContent = "";
+    elapsed.textContent = "0:00";
+    duration.textContent = "0:00";
+    progress.value = 0;
     return;
   }
   const update = () => {
+    const total = current.durationSeconds || 0;
     const seconds = Math.max(0, Math.floor((Date.now() - current.startedAt) / 1000));
-    elapsed.textContent = `${formatDuration(seconds)} / ${formatDuration(current.durationSeconds)}`;
+    elapsed.textContent = formatClock(seconds);
+    duration.textContent = total ? formatClock(total) : "?:??";
+    progress.value = total > 0 ? Math.min(1000, Math.round((seconds / total) * 1000)) : 0;
   };
   update();
   elapsedTimer = setInterval(update, 1000);
@@ -314,6 +454,7 @@ function showBrowse() {
   browseEl.classList.remove("hidden");
   openAlbum = null;
   albumReturn = "browse";
+  libraryEmpty.classList.toggle("hidden", hasSearched);
 }
 
 function showArtist() {
@@ -340,7 +481,8 @@ function appendAlbumCard(container, album, from) {
   card.className = album.inLibrary ? "album-card" : "album-card requestable";
   if (album.matchedTrack) card.title = `Matched “${album.matchedTrack}”`;
   const art = album.coverUrl ? `<img src="${escapeHtml(album.coverUrl)}" alt="">` : "";
-  card.innerHTML = `<div class="art-wrap">${art}${albumBadge(album)}</div><b>${escapeHtml(album.title)}</b><span>${escapeHtml(album.artist)}</span>`;
+  const year = album.year ? ` · ${album.year}` : "";
+  card.innerHTML = `<div class="art-wrap">${art}${albumBadge(album)}</div><b>${escapeHtml(album.title)}</b><span>${escapeHtml(album.artist)}${year}</span>`;
   bindCover(card.querySelector("img"));
   card.addEventListener("click", () => void openAlbumView(album.id, from));
   container.append(card);
@@ -356,16 +498,29 @@ function appendSection(title) {
   return section;
 }
 
+function setSearching(on) {
+  searchSkeleton.classList.toggle("hidden", !on);
+  libraryEmpty.classList.add("hidden");
+  if (on) resultsEl.innerHTML = "";
+}
+
 function renderSearch(payload) {
   showBrowse();
+  hasSearched = true;
+  libraryEmpty.classList.add("hidden");
   resultsEl.innerHTML = "";
   const artists = payload.artists ?? [];
   const albums = payload.albums ?? [];
   const tracks = payload.tracks ?? [];
   if (!artists.length && !albums.length && !tracks.length) {
-    searchStatus.textContent = payload.message || "Nothing matched.";
+    setBusy(payload.message || "Nothing matched.");
+    libraryEmpty.classList.remove("hidden");
+    libraryEmpty.querySelector("h2").textContent = "Nothing in this crate";
+    libraryEmpty.querySelector("p").textContent = payload.message || "Try another artist, album, or track.";
     return;
   }
+  libraryEmpty.querySelector("h2").textContent = "Dig through the crate";
+  libraryEmpty.querySelector("p").textContent = "Search for an artist, album, or track.";
   const parts = [];
   if (artists.length) parts.push(`${artists.length} artist${artists.length === 1 ? "" : "s"}`);
   if (albums.length) {
@@ -375,7 +530,7 @@ function renderSearch(payload) {
     if (toRequest) parts.push(`${toRequest} to request`);
   }
   if (tracks.length) parts.push(`${tracks.length} track${tracks.length === 1 ? "" : "s"}`);
-  searchStatus.textContent = parts.join(" · ");
+  setBusy(parts.join(" · "));
 
   if (artists.length) {
     const section = appendSection("Artists");
@@ -387,7 +542,7 @@ function renderSearch(payload) {
       card.className = "artist-card";
       card.title = artist.disambiguation ? `${artist.name} (${artist.disambiguation})` : artist.name;
       const art = artist.coverUrl ? `<img src="${escapeHtml(artist.coverUrl)}" alt="">` : "";
-      card.innerHTML = `<div class="art-wrap">${art}</div><b>${escapeHtml(artist.name)}</b>`;
+      card.innerHTML = `<div class="art-wrap">${art}</div><b>${escapeHtml(artist.name)}</b><span class="muted">Artist</span>`;
       bindCover(card.querySelector("img"));
       card.addEventListener("click", () => void openArtistView(artist.id));
       row.append(card);
@@ -409,31 +564,32 @@ function renderSearch(payload) {
     list.className = "tracklist search-tracks";
     for (const track of tracks) {
       const item = document.createElement("li");
-      const meta = [track.artist, track.album].filter(Boolean).join(" · ");
+      const art = `<span class="result-thumb">${track.coverUrl ? `<img src="${escapeHtml(track.coverUrl)}" alt="">` : ""}</span>`;
       const albumLink = track.albumMbid
         ? `<button type="button" class="album-link" data-album-id="${escapeHtml(track.albumMbid)}">${escapeHtml(track.album)}</button>`
-        : "";
-      const subtitle = track.albumMbid && track.album
-        ? `${escapeHtml(track.artist)}${track.artist && track.album ? " · " : ""}${albumLink}`
-        : escapeHtml(meta);
-      item.innerHTML = `<span><b>${escapeHtml(track.title)}</b><small class="muted">${subtitle}</small></span><span class="muted">${formatDuration(track.durationSeconds)}</span>`;
+        : escapeHtml(track.album || "");
+      const subtitle = [escapeHtml(track.artist), albumLink].filter(Boolean).join(" · ");
+      item.innerHTML = `${art}<span class="track-copy"><b>${escapeHtml(track.title)}</b><small>${subtitle}</small></span><span class="muted">${formatDuration(track.durationSeconds)}</span>`;
       const action = document.createElement("button");
-      action.className = "btn";
+      action.className = "action-btn";
       if (track.fileId) {
-        action.textContent = "Add";
+        action.textContent = "Play";
         action.addEventListener("click", () => void play({ fileId: track.fileId }));
       } else if (track.recordingMbid) {
         action.textContent = "Request";
         action.addEventListener("click", () =>
-          void requestMedia({
-            albumId: track.albumMbid,
-            recordingMbid: track.recordingMbid,
-            title: track.title,
-            durationSeconds: track.durationSeconds,
-          }, action),
+          void requestMedia(
+            {
+              albumId: track.albumMbid,
+              recordingMbid: track.recordingMbid,
+              title: track.title,
+              durationSeconds: track.durationSeconds,
+            },
+            action,
+          ),
         );
       } else {
-        action.textContent = "Add";
+        action.textContent = "Play";
         action.disabled = true;
       }
       item.append(action);
@@ -441,6 +597,7 @@ function renderSearch(payload) {
         event.preventDefault();
         void openAlbumView(event.currentTarget.dataset.albumId, "browse");
       });
+      bindCover(item.querySelector("img"));
       list.append(item);
     }
     section.append(list);
@@ -478,7 +635,7 @@ function paintAlbumAction() {
 
 async function openAlbumView(albumId, from = "browse") {
   albumReturn = from;
-  searchStatus.textContent = "Opening album…";
+  setBusy("Opening album…");
   try {
     const detail = await api(`/api/albums/${encodeURIComponent(albumId)}`);
     openAlbum = detail;
@@ -509,14 +666,15 @@ async function openAlbumView(albumId, from = "browse") {
       num.className = "num";
       num.textContent = String(track.trackNumber || index + 1);
       const name = document.createElement("span");
-      name.textContent = track.title;
+      name.className = "track-copy";
+      name.innerHTML = `<b>${escapeHtml(track.title)}</b>`;
       const time = document.createElement("span");
       time.className = "muted";
       time.textContent = formatDuration(track.durationSeconds);
       const action = document.createElement("button");
-      action.className = "btn";
+      action.className = "action-btn";
       if (track.fileId) {
-        action.textContent = "Add";
+        action.textContent = "Play";
         action.addEventListener("click", (event) => {
           event.stopPropagation();
           void play({ fileId: track.fileId });
@@ -525,12 +683,15 @@ async function openAlbumView(albumId, from = "browse") {
         action.textContent = "Request";
         action.addEventListener("click", (event) => {
           event.stopPropagation();
-          void requestMedia({
-            albumId: detail.album.id,
-            recordingMbid: track.recordingMbid,
-            title: track.title,
-            durationSeconds: track.durationSeconds,
-          }, action);
+          void requestMedia(
+            {
+              albumId: detail.album.id,
+              recordingMbid: track.recordingMbid,
+              title: track.title,
+              durationSeconds: track.durationSeconds,
+            },
+            action,
+          );
         });
       } else {
         action.textContent = "Request";
@@ -539,16 +700,18 @@ async function openAlbumView(albumId, from = "browse") {
       item.append(num, name, time, action);
       albumTracksEl.append(item);
     }
-    searchStatus.textContent = detail.album.inLibrary
-      ? `${detail.tracks.length} tracks`
-      : `${detail.tracks.length} tracks · request to add`;
+    setBusy(
+      detail.album.inLibrary
+        ? `${detail.tracks.length} tracks`
+        : `${detail.tracks.length} tracks · request to add`,
+    );
   } catch (error) {
-    searchStatus.textContent = error.message;
+    setBusy(error.message);
   }
 }
 
 async function openArtistView(artistId) {
-  searchStatus.textContent = "Opening artist…";
+  setBusy("Opening artist…");
   try {
     const detail = await api(`/api/artists/${encodeURIComponent(artistId)}`);
     openArtist = detail;
@@ -566,29 +729,29 @@ async function openArtistView(artistId) {
     else cover.removeAttribute("src");
     artistAlbumsEl.innerHTML = "";
     for (const album of detail.albums ?? []) appendAlbumCard(artistAlbumsEl, album, "artist");
-    searchStatus.textContent = `${detail.albums?.length ?? 0} releases`;
+    setBusy(`${detail.albums?.length ?? 0} releases`);
   } catch (error) {
-    searchStatus.textContent = error.message;
+    setBusy(error.message);
   }
 }
 
 async function play(body) {
-  searchStatus.textContent = "Sending to Rou…";
+  setBusy("Sending to Rou…");
   try {
     const result = await api("/api/play", { method: "POST", body: JSON.stringify(body) });
-    searchStatus.textContent = result.position === 0 ? "Playing now." : `Queued #${result.position}.`;
+    setBusy(result.position === 0 ? "Playing now." : `Queued #${result.position}.`);
     if (result.status) renderStatus(result.status);
   } catch (error) {
-    searchStatus.textContent = error.message;
+    setBusy(error.message);
   }
 }
 
 async function requestMedia(body, button) {
   if (button) button.disabled = true;
-  searchStatus.textContent = "Requesting through Rou…";
+  setBusy("Requesting through Rou…");
   try {
     const result = await api("/api/request", { method: "POST", body: JSON.stringify(body) });
-    searchStatus.textContent = result.message || "Requested.";
+    setBusy(result.message || "Requested.");
     if (openAlbum && result.album) {
       openAlbum.album = result.album;
       paintAlbumAction();
@@ -600,7 +763,7 @@ async function requestMedia(body, button) {
     await loadRequests();
   } catch (error) {
     if (button) button.disabled = false;
-    searchStatus.textContent = error.message;
+    setBusy(error.message);
   }
 }
 
@@ -611,58 +774,30 @@ async function queueOpenAlbum() {
       await requestMedia({ albumId: openAlbum.album.id }, document.querySelector("#queue-album-btn"));
       return;
     }
-    searchStatus.textContent = "Queueing album…";
+    setBusy("Queueing album…");
     const result = await api("/api/album", {
       method: "POST",
       body: JSON.stringify({ albumId: openAlbum.album.id }),
     });
-    searchStatus.textContent = `Queued ${result.count} tracks.`;
+    setBusy(`Queued ${result.count} tracks.`);
     if (result.status) renderStatus(result.status);
   } catch (error) {
-    searchStatus.textContent = error.message;
+    setBusy(error.message);
   }
 }
 
-document.querySelector("#search-form").addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const query = document.querySelector("#query").value.trim();
-  if (!query) return;
-  searchStatus.textContent = "Searching…";
-  try {
-    renderSearch(await api(`/api/search?q=${encodeURIComponent(query)}`));
-  } catch (error) {
-    searchStatus.textContent = error.message;
-  }
-});
-
-document.querySelector("#back-btn").addEventListener("click", () => {
-  if (albumReturn === "artist" && openArtist) {
-    showArtist();
-    searchStatus.textContent = `${openArtist.albums?.length ?? 0} releases`;
-    return;
-  }
-  showBrowse();
-});
-document.querySelector("#artist-back-btn").addEventListener("click", showBrowse);
-document.querySelector("#queue-album-btn").addEventListener("click", () => void queueOpenAlbum());
-document.querySelector("#album").addEventListener("click", () => {
-  const id = document.querySelector("#album").dataset.albumId;
-  if (id) void openAlbumView(id, "browse");
-});
-document.querySelector("#guild").addEventListener("change", async (event) => {
-  const select = event.target;
-  const guildId = select.value;
-  if (!guildId || select.dataset.moving === "1") return;
+async function moveGuild(guildId) {
+  if (!guildId) return;
   if (pendingGuildId && guildId === status?.guildId) {
     pendingGuildId = null;
     renderChannelPicker(status.channels ?? [], status.channelId);
-    searchStatus.textContent = "Staying put.";
+    setBusy("Staying put.");
     return;
   }
   if (!pendingGuildId && guildId === status?.guildId) return;
-  select.dataset.moving = "1";
-  select.disabled = true;
-  searchStatus.textContent = "Moving Rou…";
+  joining = true;
+  renderVoiceState(status ?? {});
+  setBusy("Moving Rou…");
   try {
     const dest = await api(`/api/channels?guildId=${encodeURIComponent(guildId)}`);
     const yours = dest.channels?.find((channel) => channel.you);
@@ -673,33 +808,28 @@ document.querySelector("#guild").addEventListener("change", async (event) => {
     pendingGuildId = null;
     if (result.status) renderStatus(result.status);
     await refreshChannels();
-    searchStatus.textContent = result.status?.guildName
-      ? `Rou is in ${result.status.guildName}.`
-      : "Moved.";
+    setBusy(result.status?.guildName ? `Rou is in ${result.status.guildName}.` : "Moved.");
   } catch (error) {
     if (error.status === 409 && error.payload?.channels) {
       pendingGuildId = error.payload.guildId || guildId;
       renderChannelPicker(error.payload.channels, "");
-      searchStatus.textContent = error.message;
+      setBusy(error.message);
     } else {
       pendingGuildId = null;
-      if (status?.guildId) select.value = status.guildId;
-      searchStatus.textContent = error.message;
+      setBusy(error.message);
     }
   } finally {
-    select.dataset.moving = "0";
-    select.disabled = false;
+    joining = false;
+    if (status) renderVoiceState(status);
   }
-});
+}
 
-document.querySelector("#voice-channel").addEventListener("change", async (event) => {
-  const select = event.target;
-  const channelId = select.value;
-  if (!channelId || select.dataset.moving === "1") return;
+async function joinChannel(channelId) {
+  if (!channelId) return;
   if (!pendingGuildId && channelId === status?.channelId) return;
-  select.dataset.moving = "1";
-  select.disabled = true;
-  searchStatus.textContent = pendingGuildId ? "Moving Rou…" : "Joining voice…";
+  joining = true;
+  renderVoiceState(status ?? {});
+  setBusy(pendingGuildId ? "Moving Rou…" : "Joining voice…");
   try {
     const result = pendingGuildId
       ? await api("/api/guild", {
@@ -713,17 +843,45 @@ document.querySelector("#voice-channel").addEventListener("change", async (event
     pendingGuildId = null;
     if (result.status) renderStatus(result.status);
     await refreshChannels();
-    searchStatus.textContent = result.status?.channelName
-      ? `Rou is in ${result.status.channelName}.`
-      : "Joined.";
+    setBusy(result.status?.channelName ? `Rou is in ${result.status.channelName}.` : "Joined.");
   } catch (error) {
-    if (status?.channelId) select.value = status.channelId;
-    else select.value = "";
-    searchStatus.textContent = error.message;
+    setBusy(error.message);
   } finally {
-    select.dataset.moving = "0";
-    select.disabled = false;
+    joining = false;
+    if (status) renderVoiceState(status);
   }
+}
+
+document.querySelector("#search-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const query = document.querySelector("#query").value.trim();
+  if (!query) return;
+  setSearching(true);
+  setBusy("Searching…");
+  try {
+    renderSearch(await api(`/api/search?q=${encodeURIComponent(query)}`));
+  } catch (error) {
+    setBusy(error.message);
+    libraryEmpty.classList.remove("hidden");
+  } finally {
+    setSearching(false);
+    if (hasSearched && resultsEl.children.length) libraryEmpty.classList.add("hidden");
+  }
+});
+
+document.querySelector("#back-btn").addEventListener("click", () => {
+  if (albumReturn === "artist" && openArtist) {
+    showArtist();
+    setBusy(`${openArtist.albums?.length ?? 0} releases`);
+    return;
+  }
+  showBrowse();
+});
+document.querySelector("#artist-back-btn").addEventListener("click", showBrowse);
+document.querySelector("#queue-album-btn").addEventListener("click", () => void queueOpenAlbum());
+document.querySelector("#album").addEventListener("click", () => {
+  const id = document.querySelector("#album").dataset.albumId;
+  if (id) void openAlbumView(id, "browse");
 });
 
 document.querySelector(".transport").addEventListener("click", async (event) => {
@@ -732,7 +890,7 @@ document.querySelector(".transport").addEventListener("click", async (event) => 
   try {
     await api(`/api/${action}`, { method: "POST", body: "{}" });
   } catch (error) {
-    searchStatus.textContent = error.message;
+    setBusy(error.message);
   }
 });
 
@@ -745,9 +903,50 @@ volumeInput.addEventListener("input", () => {
       method: "POST",
       body: JSON.stringify({ percent: Number(volumeInput.value) }),
     }).catch((error) => {
-      searchStatus.textContent = error.message;
+      setBusy(error.message);
     });
   }, 150);
+});
+
+function partyButton() {
+  return document.querySelector("#party-btn");
+}
+
+async function enterParty() {
+  document.body.classList.add("is-party");
+  partyButton().setAttribute("aria-pressed", "true");
+  partyButton().setAttribute("aria-label", "Exit party mode");
+  try {
+    await stageEl.requestFullscreen?.();
+  } catch {
+    // App-level full view is enough if the Fullscreen API is blocked.
+  }
+}
+
+async function exitParty() {
+  document.body.classList.remove("is-party");
+  partyButton().setAttribute("aria-pressed", "false");
+  partyButton().setAttribute("aria-label", "Enter party mode");
+  if (document.fullscreenElement) {
+    try {
+      await document.exitFullscreen();
+    } catch {
+      // ignore
+    }
+  }
+}
+
+partyButton().addEventListener("click", () => {
+  if (document.body.classList.contains("is-party")) void exitParty();
+  else void enterParty();
+});
+
+document.addEventListener("fullscreenchange", () => {
+  if (!document.fullscreenElement && document.body.classList.contains("is-party")) {
+    document.body.classList.remove("is-party");
+    partyButton().setAttribute("aria-pressed", "false");
+    partyButton().setAttribute("aria-label", "Enter party mode");
+  }
 });
 
 async function refreshChannels() {
@@ -756,6 +955,7 @@ async function refreshChannels() {
     const guildId = status?.guildId;
     const payload = await api(`/api/channels${guildId ? `?guildId=${encodeURIComponent(guildId)}` : ""}`);
     renderChannelPicker(payload.channels ?? [], status?.channelId);
+    if (status) renderVoiceState({ ...status, channels: payload.channels ?? status.channels });
   } catch {
     // Keep whatever the last status payload had.
   }
