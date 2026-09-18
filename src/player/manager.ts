@@ -29,6 +29,22 @@ const MAX_QUEUE = 200;
 
 type StatusListener = () => void;
 
+let voiceJoinLock: Promise<void> = Promise.resolve();
+
+async function withVoiceJoinLock<T>(fn: () => Promise<T>): Promise<T> {
+  const waitFor = voiceJoinLock;
+  let release!: () => void;
+  voiceJoinLock = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await waitFor;
+  try {
+    return await fn();
+  } finally {
+    release();
+  }
+}
+
 export class GuildPlayer {
   readonly player: AudioPlayer;
   private connection: VoiceConnection | undefined;
@@ -128,6 +144,13 @@ export class GuildPlayer {
     return skipped;
   }
 
+  removeQueued(index: number): QueueItem | undefined {
+    if (!Number.isInteger(index) || index < 0 || index >= this.queue.length) return undefined;
+    const [removed] = this.queue.splice(index, 1);
+    this.notify();
+    return removed;
+  }
+
   pause(): boolean {
     const paused = this.player.pause(true);
     if (paused) this.notify();
@@ -164,6 +187,18 @@ export class GuildPlayer {
       this.notify();
       return { tracks, volume };
     });
+  }
+
+  copySession(): { tracks: QueueItem[]; volume: number } {
+    return {
+      volume: this.volumePercent,
+      tracks: [...(this.current ? [this.current.track] : []), ...this.queue],
+    };
+  }
+
+  leave(): void {
+    this.resetPlayback();
+    this.notify();
   }
 
   private resetPlayback(): QueueItem[] {
@@ -228,6 +263,10 @@ export class GuildPlayer {
   }
 
   private async ensureConnected(channel: VoiceBasedChannel): Promise<void> {
+    return withVoiceJoinLock(() => this.connectVoice(channel));
+  }
+
+  private async connectVoice(channel: VoiceBasedChannel): Promise<void> {
     const existing = this.connection;
     if (existing?.joinConfig.channelId === channel.id) {
       const status = existing.state.status;
@@ -260,6 +299,7 @@ export class GuildPlayer {
     const connection = joinVoiceChannel({
       channelId: channel.id,
       guildId: channel.guild.id,
+      group: channel.guild.id,
       adapterCreator: channel.guild.voiceAdapterCreator,
       selfDeaf: true,
       daveEncryption: true,

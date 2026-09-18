@@ -312,10 +312,14 @@ function renderSearch(payload) {
     list.className = "tracklist search-tracks";
     for (const track of tracks) {
       const item = document.createElement("li");
-      const albumLabel = track.albumMbid
+      const meta = [track.artist, track.album].filter(Boolean).join(" · ");
+      const albumLink = track.albumMbid
         ? `<button type="button" class="album-link" data-album-id="${escapeHtml(track.albumMbid)}">${escapeHtml(track.album)}</button>`
-        : escapeHtml(track.album);
-      item.innerHTML = `<span>${escapeHtml(track.title)}<small class="muted">${escapeHtml(track.artist)}${track.album ? ` · ${albumLabel}` : ""}</small></span><span class="muted">${formatDuration(track.durationSeconds)}</span>`;
+        : "";
+      const subtitle = track.albumMbid && track.album
+        ? `${escapeHtml(track.artist)}${track.artist && track.album ? " · " : ""}${albumLink}`
+        : escapeHtml(meta);
+      item.innerHTML = `<span><b>${escapeHtml(track.title)}</b><small class="muted">${subtitle}</small></span><span class="muted">${formatDuration(track.durationSeconds)}</span>`;
       const action = document.createElement("button");
       action.className = "btn";
       if (track.fileId) {
@@ -549,8 +553,11 @@ document.querySelector("#album").addEventListener("click", () => {
   if (id) void openAlbumView(id, "browse");
 });
 document.querySelector("#guild").addEventListener("change", async (event) => {
-  const guildId = event.target.value;
-  if (!guildId || guildId === status?.guildId) return;
+  const select = event.target;
+  const guildId = select.value;
+  if (!guildId || guildId === status?.guildId || select.dataset.moving === "1") return;
+  select.dataset.moving = "1";
+  select.disabled = true;
   searchStatus.textContent = "Moving Rou…";
   try {
     const result = await api("/api/guild", { method: "POST", body: JSON.stringify({ guildId }) });
@@ -559,8 +566,11 @@ document.querySelector("#guild").addEventListener("change", async (event) => {
       ? `Rou is in ${result.status.guildName}.`
       : "Moved.";
   } catch (error) {
-    if (status?.guildId) event.target.value = status.guildId;
+    if (status?.guildId) select.value = status.guildId;
     searchStatus.textContent = error.message;
+  } finally {
+    select.dataset.moving = "0";
+    select.disabled = false;
   }
 });
 

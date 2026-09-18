@@ -20,6 +20,15 @@ export function coverArtArchiveUrl(mbid: string | null | undefined): string | nu
   return `https://coverartarchive.org/release-group/${encodeURIComponent(mbid)}/front-500`;
 }
 
+export function rewriteCoverUrl(url: string | null | undefined, mbid?: string | null): string | null {
+  if (url) {
+    const releaseGroup = url.match(/\/covers\/release-group\/([0-9a-f-]{36})/i);
+    if (releaseGroup?.[1]) return coverArtArchiveUrl(releaseGroup[1]);
+    return url;
+  }
+  return coverArtArchiveUrl(mbid ?? null);
+}
+
 export function toQueueItem(track: PlayableTrack, requestedBy: string): QueueItem {
   rememberPlayable(track);
   return { ...track, requestedBy };
@@ -119,9 +128,11 @@ type StoredArtist = {
 const artistById = new Map<string, StoredArtist>();
 
 function albumCoverSrc(album: StoredAlbum): string | null {
-  if (album.coverUrl && isPublicCoverUrl(album.coverUrl)) return album.coverUrl;
+  const rewritten = rewriteCoverUrl(album.coverUrl, album.mbid);
+  if (rewritten && isPublicCoverUrl(rewritten)) return rewritten;
+  if (rewritten && rewritten !== album.coverUrl) return rewritten;
   if (album.coverUrl) return `/api/cover?album=${encodeURIComponent(album.id)}`;
-  return coverArtArchiveUrl(album.mbid);
+  return rewritten;
 }
 
 export function serializeAlbum(album: StoredAlbum): PublicAlbum {

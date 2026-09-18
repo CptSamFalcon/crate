@@ -10,6 +10,7 @@ import type { DroppedNeedleClient } from "../droppedneedle/client.js";
 import {
   coverArtArchiveUrl,
   coverUrlFor,
+  rewriteCoverUrl,
   findAlbum,
   findTracks,
   getAlbum,
@@ -290,18 +291,27 @@ export function startWeb(deps: WebDeps): void {
     if (guildId === activeGuildId) return c.json({ ok: true, status: await statusPayload() });
 
     const from = currentPlayer();
+    const previousId = activeGuildId;
     const moving = Boolean(from.nowPlaying || from.upcoming.length);
     const channel = moving ? await pickVoiceChannel(client, guildId) : null;
     if (moving && !channel) {
       return c.json({ error: "No voice channel available in that server." }, 409);
     }
-    const session = await from.takeSession();
+    const session = from.copySession();
     activeGuildId = guildId;
     const to = currentPlayer();
     to.setVolume(session.volume);
-    if (session.tracks.length > 0 && channel) {
-      await to.enqueue(channel, session.tracks);
+    if (session.tracks.length > 0) from.pause();
+    try {
+      if (session.tracks.length > 0 && channel) {
+        await to.enqueue(channel, session.tracks);
+      }
+    } catch (error) {
+      activeGuildId = previousId;
+      from.resume();
+      throw error;
     }
+    if (from.guildId !== to.guildId) from.leave();
     return c.json({ ok: true, status: await statusPayload() });
   });
 
@@ -328,12 +338,17 @@ export function startWeb(deps: WebDeps): void {
     const albumId = c.req.query("album");
     const artistId = c.req.query("artist");
     if (!id && !albumId && !artistId) return new Response(null, { status: 400 });
-    const url = artistId
+    let url = artistId
       ? (coverUrlFor(`artist:${artistId}`) ?? needle.resolveUrl(`/api/v1/covers/artist/${artistId}`))
       : albumId
         ? coverUrlFor(albumId)
         : coverUrlFor(id!) ?? coverArtArchiveUrl(playableFromId(id!)?.albumMbid);
     if (!url) return new Response(null, { status: 404 });
+    url =
+      rewriteCoverUrl(
+        url,
+        playableFromId(id ?? "")?.albumMbid ?? (albumId && /^[0-9a-f-]{36}$/i.test(albumId) ? albumId : null),
+      ) ?? url;
     try {
       const response = await needle.fetchCover(url);
       if (!response.ok || !response.body) return new Response(null, { status: 502 });

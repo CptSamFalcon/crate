@@ -360,19 +360,6 @@ a {
   overflow-wrap: anywhere;
 }
 
-.search-tracks li {
-  grid-template-columns: 1fr auto auto;
-}
-
-.search-tracks small {
-  display: block;
-  font-size: 12px;
-}
-
-.search-tracks .album-link {
-  font-size: inherit;
-}
-
 .album-card {
   appearance: none;
   border: 0;
@@ -506,6 +493,27 @@ a {
 
 .tracklist.compact li {
   grid-template-columns: 1fr auto;
+}
+
+.tracklist.search-tracks li {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
+.tracklist.search-tracks li > span:first-child {
+  min-width: 0;
+}
+
+.tracklist.search-tracks small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.tracklist.search-tracks .album-link {
+  display: inline;
+  font-size: inherit;
 }
 
 .request-list li {
